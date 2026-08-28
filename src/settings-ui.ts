@@ -104,6 +104,12 @@ const SECTIONS: Section[] = [
         label: "Klammern automatisch schliessen",
         hint: "Ergänzt die schliessende Klammer beim Tippen",
       },
+      {
+        key: "vimMode",
+        type: "bool",
+        label: "Vim-Steuerung",
+        hint: "Normal-, Insert- und Visual-Modus, hjkl, :w und :q. Der Modus steht links in der Statusleiste",
+      },
     ],
   },
   {

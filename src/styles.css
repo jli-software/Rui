@@ -140,6 +140,46 @@ body[data-decoration="custom"] #titlebar {
   color: var(--accent);
 }
 
+/*
+ * Der Vim-Modus als Plakette. Die Farbe wechselt mit dem Modus, weil man
+ * beim Lernen vor allem eines wissen muss: ob der nächste Tastendruck
+ * Text schreibt oder einen Befehl auslöst. Insert und Visual borgen sich
+ * dafür Farben aus der Syntaxpalette — sie sind in jedem Theme definiert,
+ * auch im von Omarchy übernommenen.
+ */
+.status-vim {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.status-vim[data-mode="insert"] {
+  background: var(--func);
+  color: var(--bg);
+}
+
+.status-vim[data-mode="visual"] {
+  background: var(--number);
+  color: var(--bg);
+}
+
+.status-vim[data-mode="replace"] {
+  background: var(--danger);
+  color: var(--bg);
+}
+
+/* Angefangene Eingabe wie `2d` — im Text-Font, weil es Tasten sind. */
+.status-pending {
+  min-width: 2ch;
+  padding-left: 6px;
+  color: var(--muted);
+  font-family: var(--ui-font);
+}
+
 .status-selection {
   padding: 0 6px;
 }

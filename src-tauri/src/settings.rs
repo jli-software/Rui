@@ -110,6 +110,10 @@ pub struct Settings {
     pub bracket_matching: bool,
     /// Schliessende Klammer/Anführungszeichen automatisch ergänzen.
     pub close_brackets: bool,
+    /// Vim-Steuerung. Standardmässig aus: Rui soll für alle, die damit
+    /// nichts anfangen können, ein gewöhnlicher Editor bleiben — wer sie
+    /// nie einschaltet, lädt das Vim-Paket auch nie.
+    pub vim_mode: bool,
 
     // --- Beim Speichern ---
     /// Leerzeichen am Zeilenende entfernen. Praktisch, aber es verändert
@@ -161,6 +165,7 @@ impl Default for Settings {
             auto_indent: true,
             bracket_matching: true,
             close_brackets: true,
+            vim_mode: false,
 
             trim_trailing_whitespace: false,
             ensure_final_newline: false,
@@ -302,5 +307,6 @@ mod tests {
         assert_eq!(s.note_title_source, NoteTitleSource::FirstLine);
         assert_eq!(s.note_date_format, NoteDateFormat::YmdHm);
         assert_eq!(s.instant_save_delay_ms, 500);
+        assert!(!s.vim_mode);
     }
 }

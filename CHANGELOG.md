@@ -7,7 +7,6 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Geplant für 0.2
-- NeoVim-Steuerung, abschaltbar — Normal-/Insert-/Visual-Modus
 - Shortcut-Übersicht in den Einstellungen
 - Tabs (Puffer-Modell in `types.ts` ist vorbereitet)
 
@@ -17,6 +16,37 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.1.4] — 2026-08-28
+
+### Hinzugefügt
+- **Vim-Steuerung**, abschaltbar und standardmässig aus: Normal-, Insert-,
+  Visual- und Replace-Modus, Operatoren, Register, Makros und die
+  `:`-Befehle. Sie kommt von `@replit/codemirror-vim` statt aus eigener
+  Hand — der volle Umfang ist genau das, woran man Vim lernen kann, und
+  eine eigene halbe Nachbildung brächte einem falsche Griffe bei.
+- Der Modus steht links in der Statusleiste, in Vims eigener Schreibweise
+  (`NORMAL`, `INSERT`, `VISUAL LINE`) und mit wechselnder Farbe, weil beim
+  Lernen vor allem eine Frage zählt: schreibt der nächste Tastendruck Text
+  oder löst er einen Befehl aus? Daneben läuft die angefangene Eingabe mit
+  — `2d` steht dort, solange der Befehl noch nicht vollständig ist.
+- `:w`, `:wq`, `:x`, `:q`, `:q!` und `:qa` sind auf Ruis eigenes Speichern
+  und Schliessen umgebogen. Schriebe Vim selbst, liefe es an
+  `document.rs` vorbei und damit an Encoding-Erhalt und
+  Zeilenende-Wiederherstellung — eine Windows-1252-Datei mit CRLF käme
+  still als UTF-8 mit LF zurück. `:wq` schliesst nur, wenn das Speichern
+  wirklich geklappt hat.
+- Umschaltbar über die Einstellungen (Abschnitt „Eingabe") und über die
+  Befehlspalette.
+
+### Geändert
+- Die Vim-Steuerung liegt als eigener Chunk (~124 kB) neben dem Editor und
+  wird erst beim ersten Einschalten geladen. Wer sie nie anfasst, merkt
+  nichts von ihr — Rui bleibt für alle anderen ein Notepad++.
+- Der Blockcursor trägt Ruis Akzentfarbe und wechselt mit dem Farbschema.
+  Das Vim-Paket bringt einen eigenen in kräftigem Rosa mit und hängt ihn
+  mit höchster Priorität ein — dagegen kommt nur eine Regel mit
+  `!important` an, und die steht deshalb in `vim.ts` statt im Editor-Theme.
 
 ## [0.1.3] — 2026-08-28
 
@@ -115,7 +145,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.3...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/vikingjunior12/Rui/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/vikingjunior12/Rui/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/vikingjunior12/Rui/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.1

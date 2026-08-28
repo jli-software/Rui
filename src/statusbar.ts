@@ -1,4 +1,5 @@
 import type { Buffer } from "./types";
+import type { VimStatus } from "./vim";
 
 export interface StatusInfo {
   line: number;
@@ -55,11 +56,16 @@ export class StatusBar {
   private readonly encoding: HTMLButtonElement;
   private readonly lineEnding: HTMLButtonElement;
   private readonly flags: HTMLSpanElement;
+  private readonly vim: HTMLSpanElement;
+  /** Angefangene Vim-Eingabe, etwa `2d` — beim Lernen die halbe Miete. */
+  private readonly pending: HTMLSpanElement;
   private readonly settings: HTMLButtonElement;
 
   constructor(root: HTMLElement, actions: StatusActions) {
     root.innerHTML = `
       <div class="status-left">
+        <span class="status-vim" hidden></span>
+        <span class="status-pending"></span>
         <span class="status-flags"></span>
       </div>
       <div class="status-right">
@@ -82,6 +88,8 @@ export class StatusBar {
     this.encoding = root.querySelector(".status-encoding")!;
     this.lineEnding = root.querySelector(".status-eol")!;
     this.flags = root.querySelector(".status-flags")!;
+    this.vim = root.querySelector(".status-vim")!;
+    this.pending = root.querySelector(".status-pending")!;
     this.settings = root.querySelector(".status-settings")!;
 
     this.position.addEventListener("click", actions.onPosition);
@@ -111,5 +119,24 @@ export class StatusBar {
     if (modified) marks.push("Geändert");
     this.flags.textContent = marks.join(" · ");
     this.flags.classList.toggle("is-modified", modified);
+  }
+
+  /**
+   * Der Vim-Modus steht links bei den Anzeigefeldern, nicht rechts bei den
+   * Werkzeugen: Er sagt etwas aus, er tut nichts. Ist die Steuerung aus,
+   * verschwindet das Feld ganz — sonst stünde in einem Editor ohne Vim
+   * dauerhaft ein leerer Platzhalter.
+   */
+  setVimMode(status: VimStatus | null) {
+    this.vim.hidden = status === null;
+    this.pending.textContent = status?.pending ?? "";
+    if (!status) return;
+    // Vims eigene Schreibweise, damit sie einem in jedem Vim-Tutorial
+    // wieder begegnet: NORMAL, INSERT, VISUAL LINE.
+    this.vim.textContent = status.mode.toUpperCase();
+    this.vim.dataset.mode = status.mode.split(" ")[0];
+    this.vim.title = status.pending
+      ? `Vim — angefangen: ${status.pending}`
+      : "Vim-Steuerung aktiv";
   }
 }

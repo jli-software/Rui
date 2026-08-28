@@ -67,6 +67,7 @@ export interface Settings {
   autoIndent: boolean;
   bracketMatching: boolean;
   closeBrackets: boolean;
+  vimMode: boolean;
 
   trimTrailingWhitespace: boolean;
   ensureFinalNewline: boolean;

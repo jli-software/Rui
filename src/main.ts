@@ -52,10 +52,22 @@ class App {
     this.buffer = this.emptyBuffer();
 
     const host = document.querySelector<HTMLElement>("#editor")!;
-    this.editor = new RuiEditor(host, this.settings, "", {
-      onChange: () => this.onChanged(),
-      onCursor: () => this.refreshStatus(),
-    });
+    this.editor = new RuiEditor(
+      host,
+      this.settings,
+      "",
+      {
+        onChange: () => this.onChanged(),
+        onCursor: () => this.refreshStatus(),
+        onVimMode: (status) => this.status.setVimMode(status),
+      },
+      {
+        // `:w` und `:q` laufen über Ruis eigene Wege — sonst schriebe Vim
+        // an `document.rs` vorbei und damit am Encoding der Datei.
+        write: () => this.save(),
+        quit: (force) => void this.quit(force),
+      },
+    );
 
     this.palette = new CommandPalette(() => this.commands());
     this.settingsDialog = new SettingsDialog(
@@ -76,6 +88,9 @@ class App {
     this.bindShortcuts();
     this.bindWindowEvents();
     this.watchSystemTheme();
+    // Vor dem Öffnen der Datei: `loadDocument` baut den Editorzustand neu
+    // auf und soll die Steuerung schon enthalten.
+    await this.editor.applyVimMode();
     await this.applyDecoration(this.settings.decorationMode);
     await this.refreshOmarchyTheme();
 
@@ -446,6 +461,12 @@ class App {
     if (prev.decorationMode !== next.decorationMode) {
       await this.applyDecoration(next.decorationMode);
     }
+    if (prev.vimMode !== next.vimMode) {
+      await this.editor.applyVimMode();
+      // Nach dem Umschalten gehört der Fokus zurück in den Text, sonst
+      // tippt man ins Leere und hält die Steuerung für kaputt.
+      this.editor.view.focus();
+    }
     this.refreshStatus();
     try {
       await invoke("save_settings", { settings: next });
@@ -465,6 +486,7 @@ class App {
     this.settings = await invoke<Settings>("load_settings");
     this.editor.applySettings(this.settings);
     await this.editor.applyLanguage(this.language);
+    await this.editor.applyVimMode();
     this.settingsDialog.refresh();
     this.refreshStatus();
   }
@@ -587,6 +609,23 @@ class App {
     );
   }
 
+  /**
+   * `:q` aus der Vim-Steuerung. Geht bewusst denselben Weg wie das
+   * Fensterkreuz, damit Sitzung und Rückfrage nicht umgangen werden.
+   */
+  private async quit(force: boolean) {
+    const win = getCurrentWindow();
+    if (!force) {
+      await win.close();
+      return;
+    }
+    // `:q!` fragt nicht nach. Die Sitzung wird trotzdem geschrieben: sie
+    // ist Ruis Sicherheitsnetz, nicht die Datei, die man verwerfen wollte.
+    await this.saveSession();
+    this.closing = true;
+    await win.destroy();
+  }
+
   private async gotoLine() {
     const answer = await promptInput("Gehe zu Zeile", "");
     const line = Number(answer);
@@ -684,6 +723,7 @@ class App {
       this.toggle("showWhitespace", "Leerzeichen sichtbar"),
       this.toggle("highlightActiveLine", "Aktuelle Zeile hervorheben"),
       this.toggle("syntaxHighlighting", "Syntaxhervorhebung"),
+      this.toggle("vimMode", "Vim-Steuerung", "Eingabe"),
       {
         id: "view.theme",
         group: "Ansicht",

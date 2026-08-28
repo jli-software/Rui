@@ -40,6 +40,11 @@ checksum published with each release if you want to be sure of what you got.
 - **Crash-safe writes** — saving goes through a temporary neighbouring file
   followed by a rename, so a crash mid-save cannot destroy your file
 - **Notes folder with instant save** — see below
+- **Vim keybindings**, off by default and switchable from the settings —
+  normal, insert, visual and replace mode, with the current one shown on the
+  left of the status bar. `:w`, `:wq`, `:x` and `:q` go through Rui's own
+  save and close, so encoding and line endings survive them. The whole thing
+  is a lazy chunk: leave it off and it never loads.
 - **Sage colour palette**, light and dark, plus automatic
   [Omarchy](https://omarchy.org) theme detection on Linux
 
@@ -54,6 +59,9 @@ checksum published with each release if you want to be sure of what you got.
 | `Ctrl+G` | Go to line |
 | `Ctrl+,` | Settings |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | Font size |
+
+With Vim keybindings enabled, everything Vim binds works inside the text
+area; Rui's own `Ctrl` shortcuts keep working alongside it.
 
 Everything else lives in the command palette.
 
@@ -156,13 +164,12 @@ file size at around 25 MB — beyond that, Rui asks first.
 | `src/theme.ts` | Sage palettes, light and dark |
 | `src/languages.ts` | Language detection, each language its own lazy chunk |
 | `src/palette.ts` | Command palette and input dialog |
+| `src/vim.ts` | Vim keybindings, ex commands, mode reporting (lazy chunk) |
 | `src/settings-ui.ts` | Settings dialog, generated from a description |
 | `src/main.ts` | Wiring, commands, shortcuts |
 
 ## Roadmap
 
-- Vim keybindings, switchable — normal/insert/visual mode, so the whole
-  editor is reachable from the keyboard
 - A shortcut reference inside the settings
 - Tabs (the buffer model in `types.ts` is prepared for it)
 - Theming beyond the two built-in palettes

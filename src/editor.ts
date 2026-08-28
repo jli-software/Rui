@@ -33,10 +33,13 @@ import { editorTheme, sageDark, sageLight, applyPalette } from "./theme";
 import type { Palette } from "./theme";
 import type { LanguageDef } from "./languages";
 import type { Settings } from "./types";
+import type { VimHost, VimStatus } from "./vim";
 
 export interface EditorCallbacks {
   onChange: () => void;
   onCursor: () => void;
+  /** Vim-Modus für die Statusleiste; `null`, wenn die Steuerung aus ist. */
+  onVimMode: (status: VimStatus | null) => void;
 }
 
 /**
@@ -62,7 +65,15 @@ export class RuiEditor {
    */
   private omarchy: { palette: Palette; dark: boolean } | null = null;
 
+  /**
+   * Das nachgeladene Vim-Modul, sobald die Steuerung einmal an war. Es
+   * bleibt danach liegen: Wer sie ausprobiert und wieder abschaltet, soll
+   * beim nächsten Einschalten nicht erneut auf den Chunk warten.
+   */
+  private vimModule: typeof import("./vim") | null = null;
+
   private readonly c = {
+    vim: new Compartment(),
     language: new Compartment(),
     theme: new Compartment(),
     lineNumbers: new Compartment(),
@@ -82,6 +93,7 @@ export class RuiEditor {
     settings: Settings,
     doc: string,
     private readonly callbacks: EditorCallbacks,
+    private readonly vimHost: VimHost,
     extraKeys: Extension = [],
   ) {
     this.settings = settings;
@@ -106,6 +118,10 @@ export class RuiEditor {
         highlightSelectionMatches(),
         foldGutter(),
         search({ top: true }),
+        // Vor den Keymaps: bei gleicher Priorität gewinnt in CodeMirror,
+        // was früher in der Liste steht. Stünde Vim dahinter, fingen die
+        // Standardbindungen die Tasten vorher ab.
+        this.c.vim.of(this.vimExt()),
         this.extraKeys,
         keymap.of([
           ...closeBracketsKeymap,
@@ -144,6 +160,8 @@ export class RuiEditor {
   loadDocument(content: string) {
     this.lastLine = 1;
     this.view.setState(this.buildState(content));
+    // Der State ist neu, also auch der Vim-Adapter darin.
+    this.syncVimStatus();
     this.view.focus();
   }
 
@@ -274,6 +292,37 @@ export class RuiEditor {
     this.view.dispatch({
       effects: this.c.readOnly.reconfigure(readOnly ? EditorState.readOnly.of(true) : []),
     });
+  }
+
+  // ---- Vim-Steuerung ----------------------------------------------------
+
+  /**
+   * Schaltet die Vim-Steuerung auf den Stand der Einstellungen.
+   *
+   * Das Paket wird erst beim ersten Einschalten geholt — ausgeschaltet
+   * kostet die Steuerung damit nichts ausser dieser Methode. `async`
+   * deshalb, und deshalb hängt sie nicht in `applySettings`.
+   */
+  async applyVimMode() {
+    if (this.settings.vimMode && !this.vimModule) {
+      this.vimModule = await import("./vim");
+    }
+    this.view.dispatch({ effects: this.c.vim.reconfigure(this.vimExt()) });
+    this.syncVimStatus();
+  }
+
+  private vimExt(): Extension {
+    if (!this.settings.vimMode || !this.vimModule) return [];
+    return this.vimModule.vimExtension(this.vimHost);
+  }
+
+  /** Hängt die Modusanzeige an den aktuellen Adapter — oder leert sie. */
+  private syncVimStatus() {
+    if (!this.settings.vimMode || !this.vimModule) {
+      this.callbacks.onVimMode(null);
+      return;
+    }
+    this.vimModule.watchMode(this.view, this.callbacks.onVimMode);
   }
 
   // ---- Abfragen für die Statusleiste ------------------------------------
