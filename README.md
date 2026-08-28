@@ -60,16 +60,30 @@ Everything else lives in the command palette.
 ## Notes folder (instant save)
 
 Pick a notes folder in the settings and Rui keeps every open buffer saved on
-its own from then on — roughly half a second after the last keystroke, no
-`Ctrl+S` needed.
+its own from then on — half a second after the last keystroke by default, no
+`Ctrl+S` needed. That delay is a setting.
 
 A new, still unnamed note takes its filename from the first line (whitespace
 becomes `_`, forbidden characters are dropped) and lands in that folder
 automatically; if the first line changes later, the file is renamed along with
-it. An entirely empty first line leaves an already named note alone, and a new
-note without any title gets a readable timestamp as its name. Collisions
-resolve the way Finder and Explorer do it, with an appended counter —
-`Name (2).md` and so on.
+it. An entirely empty first line leaves an already named note alone.
+Collisions resolve the way Finder and Explorer do it, with an appended
+counter — `Name (2).md` and so on.
+
+What the name is built from is up to you:
+
+| Setting | Result |
+|---|---|
+| First line | `Shopping_list.md` |
+| Date | `2026-08-28 1423.md` |
+| Date, then first line | `2026-08-28 1423 Shopping_list.md` |
+| First line, then date | `Shopping_list 2026-08-28 1423.md` |
+
+Whenever the first line is empty, the date stands in for it. The date format
+is a setting too — `2026-08-28`, `20260828-1423`, `28.08.2026` and so on. It
+uses **local time**, fixed at the moment the note was created: a note written
+at 23:30 is not dated tomorrow, and renaming it next week does not re-date
+it.
 
 Instant save deliberately runs **without** the save transforms
 (`trimTrailingWhitespace` / `ensureFinalNewline`) — those would wipe out a
@@ -147,7 +161,11 @@ file size at around 25 MB — beyond that, Rui asks first.
 
 ## Roadmap
 
+- Vim keybindings, switchable — normal/insert/visual mode, so the whole
+  editor is reachable from the keyboard
+- A shortcut reference inside the settings
 - Tabs (the buffer model in `types.ts` is prepared for it)
+- Theming beyond the two built-in palettes
 - UI localisation (English first)
 - Code signing for Windows, notarisation for macOS
 - Auto-update — the updater plugin and its key have to ship in the bundle,

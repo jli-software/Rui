@@ -1,6 +1,6 @@
 [package]
 name = "rui"
-version = "0.1.2"
+version = "0.1.3"
 description = "A lean text editor for snippets and notes"
 authors = ["Jonas Gaiching"]
 edition = "2021"
@@ -32,6 +32,11 @@ chardetng = "0.1"
 # Omarchy-Theme: colors.toml lesen, auf Änderung reagieren.
 toml = "0.8"
 notify = "6"
+
+# Lokalzeit für die Datumsnamen von Notizen. Liegt über tauri ohnehin schon
+# mit `clock` im Baum, kostet also nichts zusätzlich — und eine Notiz, die um
+# 23:30 entsteht, soll nicht auf den nächsten Tag datiert sein.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [dev-dependencies]
 tempfile = "3"

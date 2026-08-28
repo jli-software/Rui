@@ -2939,9 +2939,10 @@ dependencies = [
 
 [[package]]
 name = "rui"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "chardetng",
+ "chrono",
  "encoding_rs",
  "notify",
  "serde",

@@ -12,19 +12,14 @@ use std::env;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DecorationMode {
+    #[default]
     Auto,
     Native,
     Custom,
     None,
-}
-
-impl Default for DecorationMode {
-    fn default() -> Self {
-        DecorationMode::Auto
-    }
 }
 
 impl DecorationMode {
@@ -125,12 +120,21 @@ pub fn resolve_decoration(mode: DecorationMode) -> ResolvedDecoration {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
     use super::*;
+
+    /// Beide Tests hängen an derselben Umgebungsvariablen, und die gehört
+    /// dem ganzen Prozess. Cargo lässt Tests aber parallel in Threads
+    /// laufen — ohne diese Sperre sieht der zweite Test gelegentlich das
+    /// `RUI_DECORATION` des ersten und schlägt scheinbar grundlos fehl.
+    static ENV: Mutex<()> = Mutex::new(());
 
     #[test]
     fn env_override_gewinnt_gegen_einstellung() {
-        // SAFETY: Tests laufen hier seriell genug, dass das keinen anderen
-        // Test stört — dieses Modul ist die einzige Stelle, die die Variable liest.
+        let _guard = ENV.lock().unwrap_or_else(|e| e.into_inner());
+        // SAFETY: `ENV` hält alle Leser dieser Variablen auseinander, und
+        // dieses Modul ist die einzige Stelle, die sie überhaupt anfasst.
         unsafe { env::set_var("RUI_DECORATION", "none") };
         let resolved = resolve(DecorationMode::Native);
         unsafe { env::remove_var("RUI_DECORATION") };
@@ -139,6 +143,7 @@ mod tests {
 
     #[test]
     fn manuelle_einstellung_gewinnt_gegen_plattform_default() {
+        let _guard = ENV.lock().unwrap_or_else(|e| e.into_inner());
         let resolved = resolve(DecorationMode::Custom);
         assert_eq!(resolved.mode, DecorationMode::Custom);
     }

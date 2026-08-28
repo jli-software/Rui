@@ -15,30 +15,72 @@ use tauri::{AppHandle, Manager};
 use crate::decoration::DecorationMode;
 use crate::document::LineEnding;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Theme {
     SageLight,
     SageDark,
+    #[default]
     System,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
-        Theme::System
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum NoteExtension {
+    #[default]
     Md,
     Txt,
 }
 
-impl Default for NoteExtension {
-    fn default() -> Self {
-        NoteExtension::Md
+/// Woraus der Dateiname einer selbst benannten Notiz entsteht.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NoteTitleSource {
+    /// Erste Zeile. Solange sie leer ist, springt das Datum ein — ohne
+    /// Namen könnte die Notiz sonst gar nicht erst angelegt werden.
+    #[default]
+    FirstLine,
+    /// Immer das Datum. Der Name steht damit ab dem ersten Tastendruck
+    /// fest und ändert sich nie wieder.
+    Date,
+    /// Datum, dann erste Zeile: `2026-08-28 1423 Einkaufsliste`.
+    DateFirstLine,
+    /// Erste Zeile, dann Datum: `Einkaufsliste 2026-08-28 1423`.
+    FirstLineDate,
+}
+
+/// Vorgaben statt eines freien Musters: ein vertippter Formatstring würde
+/// still danebenliegende Dateinamen erzeugen, und ein Dateiname lässt sich
+/// nicht so leicht zurücknehmen wie eine Anzeige.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NoteDateFormat {
+    /// 2026-08-28
+    Ymd,
+    /// Der Standard: mit Uhrzeit, weil das Datum vor allem für namenlose
+    /// Notizen einspringt — ohne sie hiessen zwei am selben Tag gleich.
+    ///
+    /// 2026-08-28 1423
+    #[default]
+    YmdHm,
+    /// 20260828
+    YmdCompact,
+    /// 20260828-1423
+    YmdCompactHm,
+    /// 28.08.2026
+    Dmy,
+}
+
+impl NoteDateFormat {
+    /// Das zugehörige chrono-Muster.
+    pub fn pattern(self) -> &'static str {
+        match self {
+            NoteDateFormat::Ymd => "%Y-%m-%d",
+            NoteDateFormat::YmdHm => "%Y-%m-%d %H%M",
+            NoteDateFormat::YmdCompact => "%Y%m%d",
+            NoteDateFormat::YmdCompactHm => "%Y%m%d-%H%M",
+            NoteDateFormat::Dmy => "%d.%m.%Y",
+        }
     }
 }
 
@@ -91,6 +133,12 @@ pub struct Settings {
     /// ihrer ersten Zeile benannt und landen automatisch in diesem Ordner.
     pub notes_folder: Option<String>,
     pub note_extension: NoteExtension,
+    pub note_title_source: NoteTitleSource,
+    pub note_date_format: NoteDateFormat,
+    /// Wartezeit nach dem letzten Tastendruck, bevor gespeichert wird.
+    /// Kurz genug, dass es sich anfühlt, als wäre immer schon gespeichert;
+    /// lang genug, dass nicht jeder Buchstabe die Platte anfasst.
+    pub instant_save_delay_ms: u32,
 }
 
 impl Default for Settings {
@@ -125,6 +173,9 @@ impl Default for Settings {
 
             notes_folder: None,
             note_extension: NoteExtension::Md,
+            note_title_source: NoteTitleSource::FirstLine,
+            note_date_format: NoteDateFormat::YmdHm,
+            instant_save_delay_ms: 500,
         }
     }
 }
@@ -148,6 +199,14 @@ pub struct Session {
     pub encoding: Option<String>,
     pub line_ending: Option<LineEnding>,
     pub bom: bool,
+    /// Entstehungszeit des Puffers (Epoche in ms). Ohne sie bekäme eine
+    /// gestern angelegte Notiz nach dem Neustart beim nächsten Umbenennen
+    /// das heutige Datum in den Namen.
+    pub created_at_ms: Option<i64>,
+    /// Ob Rui die Notiz selbst benannt hat. Ohne dieses Feld galt sie nach
+    /// einem Neustart als von Hand geöffnet und wurde nie wieder
+    /// umbenannt, obwohl sich ihre erste Zeile änderte.
+    pub auto_named: bool,
 }
 
 fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -198,4 +257,50 @@ pub fn load_session(app: AppHandle) -> Result<Session, String> {
 #[tauri::command]
 pub fn save_session(app: AppHandle, session: Session) -> Result<(), String> {
     write_json(&config_dir(&app)?.join("session.json"), &session)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `types.ts` spiegelt diese Namen von Hand. Weicht einer ab, merkt man
+    /// es sonst erst zur Laufzeit — und dann still, weil `#[serde(default)]`
+    /// klaglos den Standardwert einsetzt statt zu meckern.
+    #[test]
+    fn enum_namen_stimmen_mit_dem_frontend_ueberein() {
+        assert_eq!(name(&NoteTitleSource::FirstLine), "first-line");
+        assert_eq!(name(&NoteTitleSource::Date), "date");
+        assert_eq!(name(&NoteTitleSource::DateFirstLine), "date-first-line");
+        assert_eq!(name(&NoteTitleSource::FirstLineDate), "first-line-date");
+
+        assert_eq!(name(&NoteDateFormat::Ymd), "ymd");
+        assert_eq!(name(&NoteDateFormat::YmdHm), "ymd-hm");
+        assert_eq!(name(&NoteDateFormat::YmdCompact), "ymd-compact");
+        assert_eq!(name(&NoteDateFormat::YmdCompactHm), "ymd-compact-hm");
+        assert_eq!(name(&NoteDateFormat::Dmy), "dmy");
+
+        assert_eq!(name(&NoteExtension::Md), "md");
+        assert_eq!(name(&Theme::SageLight), "sage-light");
+    }
+
+    fn name<T: Serialize>(value: &T) -> String {
+        serde_json::to_string(value)
+            .unwrap()
+            .trim_matches('"')
+            .to_string()
+    }
+
+    /// Eine Einstellungsdatei aus einer älteren Version kennt die neuen
+    /// Felder nicht — sie muss trotzdem laden und die Defaults bekommen.
+    #[test]
+    fn alte_einstellungsdatei_bekommt_die_neuen_defaults() {
+        let alt = r#"{ "theme": "sage-dark", "notesFolder": "/tmp/notizen" }"#;
+        let s: Settings = serde_json::from_str(alt).unwrap();
+
+        assert_eq!(s.theme, Theme::SageDark);
+        assert_eq!(s.notes_folder.as_deref(), Some("/tmp/notizen"));
+        assert_eq!(s.note_title_source, NoteTitleSource::FirstLine);
+        assert_eq!(s.note_date_format, NoteDateFormat::YmdHm);
+        assert_eq!(s.instant_save_delay_ms, 500);
+    }
 }

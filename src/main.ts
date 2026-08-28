@@ -97,6 +97,7 @@ class App {
       readOnly: false,
       mtimeMs: 0,
       savedContent: "",
+      createdAtMs: Date.now(),
       autoNamed: false,
     };
   }
@@ -187,6 +188,7 @@ class App {
       readOnly: doc.readOnly,
       mtimeMs: doc.mtimeMs,
       savedContent: doc.content,
+      createdAtMs: Date.now(),
       // Von Hand geöffnet — wird nie umbenannt, auch nicht im Notizen-Ordner.
       autoNamed: false,
     };
@@ -306,7 +308,10 @@ class App {
     window.clearTimeout(this.instantSaveTimer);
     // Kurz gedrosselt statt bei jedem Tastendruck, aber kurz genug, dass es
     // sich anfühlt, als würde einfach immer alles schon gespeichert sein.
-    this.instantSaveTimer = window.setTimeout(() => void this.instantSave(), 500);
+    this.instantSaveTimer = window.setTimeout(
+      () => void this.instantSave(),
+      this.settings.instantSaveDelayMs,
+    );
   }
 
   private async instantSave() {
@@ -334,6 +339,9 @@ class App {
           encoding: this.buffer.encoding,
           bom: this.buffer.bom,
           lineEnding: this.buffer.lineEnding,
+          titleSource: this.settings.noteTitleSource,
+          dateFormat: this.settings.noteDateFormat,
+          createdAtMs: this.buffer.createdAtMs,
         });
         this.buffer.path = result.path;
         this.buffer.autoNamed = true;
@@ -376,6 +384,8 @@ class App {
       encoding: this.buffer.encoding,
       lineEnding: this.buffer.lineEnding,
       bom: this.buffer.bom,
+      createdAtMs: this.buffer.createdAtMs,
+      autoNamed: this.buffer.autoNamed,
     };
     try {
       await invoke("save_session", { session });
@@ -400,6 +410,12 @@ class App {
     if (session.path) {
       await this.openPath(session.path, true);
     }
+    // Nach `openPath` gesetzt: das legt den Puffer neu an und würde die
+    // Entstehungszeit sonst auf jetzt und `autoNamed` auf false stellen.
+    // Ohne beides verlöre eine selbst benannte Notiz über den Neustart
+    // hinweg ihr Umbenennen und bekäme das Datum von heute.
+    if (session.createdAtMs) this.buffer.createdAtMs = session.createdAtMs;
+    this.buffer.autoNamed = session.autoNamed;
     if (session.unsavedContent !== null && session.unsavedContent !== undefined) {
       // Der ungespeicherte Stand gewinnt gegen den Dateiinhalt — sonst
       // wäre das Sicherheitsnetz nutzlos.

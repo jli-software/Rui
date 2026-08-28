@@ -8,9 +8,12 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
+use chrono::{Local, TimeZone};
 use serde::{Deserialize, Serialize};
+
+use crate::settings::{NoteDateFormat, NoteTitleSource};
 
 /// Ab dieser Grösse wird nachgefragt, bevor geöffnet wird. Der Puffer lebt
 /// im Webview, darüber wird das Tippgefühl spürbar zäh.
@@ -229,47 +232,70 @@ const FORBIDDEN_IN_NAMES: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '
 /// gekappt. Leer heisst: kein Titel ableitbar.
 fn sanitize_title(title: &str) -> Option<String> {
     let collapsed = title.split_whitespace().collect::<Vec<_>>().join("_");
-    let cleaned: String = collapsed
+    sanitize_stem(&collapsed, 80)
+}
+
+/// Wie `sanitize_title`, aber ohne Leerraum zu Unterstrichen zu machen.
+/// Für den fertig zusammengesetzten Namen gedacht, in dem das Leerzeichen
+/// Datum und Titel voneinander trennt und deshalb erhalten bleiben muss.
+fn sanitize_stem(stem: &str, max: usize) -> Option<String> {
+    let cleaned: String = stem
         .chars()
         .filter(|c| !FORBIDDEN_IN_NAMES.contains(c) && !c.is_control())
         .collect();
     let trimmed = cleaned.trim_matches(|c: char| c == '.' || c.is_whitespace());
-    let truncated: String = trimmed.chars().take(80).collect();
+    // Kürzen kann am Ende wieder Leerraum freilegen, deshalb danach nochmal.
+    let truncated = trimmed.chars().take(max).collect::<String>();
+    let truncated = truncated.trim_end();
 
     if truncated.is_empty() {
         None
     } else {
-        Some(truncated)
+        Some(truncated.to_string())
     }
 }
 
-/// Lesbarer Name für eine Notiz ohne Titel, z. B. "Notiz 2026-08-27 1723".
-/// UTC statt lokaler Zeit, um ohne zusätzliche Crate auszukommen — für
-/// einen Platzhalternamen ist das genau genug.
-fn fallback_title() -> String {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let (y, m, d) = civil_from_days((secs / 86_400) as i64);
-    let tod = secs % 86_400;
-    format!("Notiz {y:04}-{m:02}-{d:02} {:02}{:02}", tod / 3600, (tod % 3600) / 60)
+/// Datum eines Zeitpunkts in **Lokalzeit**, im gewählten Format.
+///
+/// Lokalzeit, nicht UTC: eine Notiz, die um 23:30 entsteht, trüge sonst
+/// dauerhaft das Datum des nächsten Tages im Dateinamen — und ein
+/// Dateiname lässt sich nicht so leicht korrigieren wie eine Anzeige.
+fn format_date(format: NoteDateFormat, created_at_ms: i64) -> String {
+    Local
+        .timestamp_millis_opt(created_at_ms)
+        .single()
+        // Ein unbrauchbarer Zeitstempel darf keine Notiz verhindern.
+        .unwrap_or_else(Local::now)
+        .format(format.pattern())
+        .to_string()
 }
 
-/// Tage seit der Unix-Epoche in ein Kalenderdatum umrechnen (proleptisch
-/// gregorianisch, UTC) — Howard Hinnants Algorithmus, um für diese eine
-/// Stelle keine chrono-Abhängigkeit zu brauchen.
-fn civil_from_days(z: i64) -> (i64, u32, u32) {
-    let z = z + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    (if m <= 2 { y + 1 } else { y }, m, d)
+/// Den Dateinamen-Stamm aus erster Zeile und Datum zusammensetzen.
+///
+/// `first_line` ist bereits durch `sanitize_title` gegangen, ist also
+/// entweder ein brauchbarer Stamm oder `None`. Das Datum steht immer zur
+/// Verfügung, deshalb kommt hier immer ein Name heraus — eine Notiz ohne
+/// Namen liesse sich sonst gar nicht erst anlegen.
+fn compose_stem(
+    source: NoteTitleSource,
+    date_format: NoteDateFormat,
+    first_line: Option<&str>,
+    created_at_ms: i64,
+) -> String {
+    let date = format_date(date_format, created_at_ms);
+    let combined = match (source, first_line) {
+        (NoteTitleSource::Date, _) | (_, None) => date.clone(),
+        (NoteTitleSource::FirstLine, Some(title)) => title.to_string(),
+        (NoteTitleSource::DateFirstLine, Some(title)) => format!("{date} {title}"),
+        (NoteTitleSource::FirstLineDate, Some(title)) => format!("{title} {date}"),
+    };
+
+    // Grosszügiger als die 80 Zeichen der ersten Zeile, weil hier noch das
+    // Datum dazukommt — aber gedeckelt, damit der Pfad nicht ausufert.
+    sanitize_stem(&combined, 120)
+        // Nur erreichbar, wenn selbst das Datum wegsaniert würde. Dann ist
+        // ein fester Name immer noch besser als eine verlorene Notiz.
+        .unwrap_or_else(|| "Notiz".to_string())
 }
 
 fn is_taken(path: &Path, keep: Option<&Path>) -> bool {
@@ -304,11 +330,16 @@ pub struct NoteSaveResult {
 }
 
 /// Speichert eine Notiz im Instant-Save-Modus: neue Puffer bekommen ihren
-/// Namen aus der ersten Zeile, bereits automatisch benannte Notizen werden
-/// bei Bedarf mitverschoben. Eine Notiz, die von Hand geöffnet wurde (also
-/// nie über diesen Befehl entstand), landet nie hier — dafür bleibt
-/// `save_file` zuständig, ganz ohne Umbenennen.
+/// Namen nach der eingestellten Titelquelle, bereits automatisch benannte
+/// Notizen werden bei Bedarf mitverschoben. Eine Notiz, die von Hand
+/// geöffnet wurde (also nie über diesen Befehl entstand), landet nie hier —
+/// dafür bleibt `save_file` zuständig, ganz ohne Umbenennen.
+///
+/// `created_at_ms` ist die Entstehungszeit des Puffers, nicht „jetzt": in
+/// den Modi mit Datum im Namen würde eine Notiz sonst beim Umbenennen kurz
+/// nach Mitternacht auf den neuen Tag springen.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn save_note(
     current_path: Option<String>,
     folder: String,
@@ -318,6 +349,9 @@ pub fn save_note(
     encoding: String,
     bom: bool,
     line_ending: LineEnding,
+    title_source: NoteTitleSource,
+    date_format: NoteDateFormat,
+    created_at_ms: i64,
 ) -> Result<NoteSaveResult, String> {
     let folder_buf = PathBuf::from(&folder);
     if !folder_buf.is_dir() {
@@ -325,20 +359,33 @@ pub fn save_note(
     }
 
     let current = current_path.as_ref().map(PathBuf::from);
-    let target = match (sanitize_title(&title), &current) {
-        (Some(stem), Some(cur)) => {
-            let cur_stem = cur.file_stem().map(|s| s.to_string_lossy().into_owned());
-            if cur_stem.as_deref() == Some(stem.as_str()) {
-                cur.clone()
-            } else {
-                unique_note_path(&folder_buf, &stem, &extension, Some(cur.as_path()))
+    let first_line = sanitize_title(&title);
+
+    let target = match (&first_line, &current) {
+        // Erste Zeile gerade leer (z. B. Text markiert, um ihn zu ersetzen):
+        // Namen der bestehenden Notiz nicht wegen eines Zwischenzustands
+        // wechseln. Gilt auch in den Datums-Modi — dort käme derselbe Name
+        // heraus, aber die Regel soll nicht von der Einstellung abhängen.
+        (None, Some(cur)) => cur.clone(),
+        _ => {
+            let stem = compose_stem(
+                title_source,
+                date_format,
+                first_line.as_deref(),
+                created_at_ms,
+            );
+            match &current {
+                Some(cur) => {
+                    let cur_stem = cur.file_stem().map(|s| s.to_string_lossy().into_owned());
+                    if cur_stem.as_deref() == Some(stem.as_str()) {
+                        cur.clone()
+                    } else {
+                        unique_note_path(&folder_buf, &stem, &extension, Some(cur.as_path()))
+                    }
+                }
+                None => unique_note_path(&folder_buf, &stem, &extension, None),
             }
         }
-        (Some(stem), None) => unique_note_path(&folder_buf, &stem, &extension, None),
-        // Erste Zeile gerade leer (z. B. Text markiert, um ihn zu ersetzen):
-        // Namen der bestehenden Notiz nicht wegen eines Zwischenzustands wechseln.
-        (None, Some(cur)) => cur.clone(),
-        (None, None) => unique_note_path(&folder_buf, &fallback_title(), &extension, None),
     };
 
     if let Some(cur) = &current {
@@ -412,10 +459,69 @@ mod tests {
         assert_eq!(sanitize_title(&lang).unwrap().chars().count(), 80);
     }
 
+    /// Ein fester Zeitpunkt in Lokalzeit, damit die Tests in jeder
+    /// Zeitzone dasselbe erwarten dürfen.
+    fn zeitpunkt(h: u32, min: u32) -> i64 {
+        Local
+            .with_ymd_and_hms(2026, 8, 28, h, min, 0)
+            .unwrap()
+            .timestamp_millis()
+    }
+
     #[test]
-    fn kalenderdatum_stimmt() {
-        // 2024-01-01 00:00:00 UTC == Tag 19723 seit der Epoche.
-        assert_eq!(civil_from_days(19_723), (2024, 1, 1));
+    fn zusammengesetzter_name_behaelt_leerzeichen() {
+        // Der Unterstrich gilt nur innerhalb der ersten Zeile; das
+        // Leerzeichen trennt hier Datum und Titel und muss bleiben.
+        assert_eq!(
+            sanitize_stem("2026-08-28 Notiz", 120),
+            Some("2026-08-28 Notiz".to_string())
+        );
+        assert_eq!(sanitize_stem("a:b", 120), Some("ab".to_string()));
+        assert_eq!(sanitize_stem("   ", 120), None);
+        // Kürzen darf keinen Leerraum am Ende zurücklassen.
+        assert_eq!(sanitize_stem("abc def", 4), Some("abc".to_string()));
+    }
+
+    #[test]
+    fn titel_wird_aus_quelle_und_datum_zusammengesetzt() {
+        let ts = zeitpunkt(14, 23);
+        let title = Some("Einkaufsliste");
+
+        assert_eq!(
+            compose_stem(NoteTitleSource::FirstLine, NoteDateFormat::Ymd, title, ts),
+            "Einkaufsliste"
+        );
+        // Ohne erste Zeile springt in jedem Modus das Datum ein.
+        assert_eq!(
+            compose_stem(NoteTitleSource::FirstLine, NoteDateFormat::Ymd, None, ts),
+            "2026-08-28"
+        );
+        // Im Datums-Modus hat die erste Zeile keinen Einfluss.
+        assert_eq!(
+            compose_stem(NoteTitleSource::Date, NoteDateFormat::YmdHm, title, ts),
+            "2026-08-28 1423"
+        );
+        assert_eq!(
+            compose_stem(NoteTitleSource::DateFirstLine, NoteDateFormat::Ymd, title, ts),
+            "2026-08-28 Einkaufsliste"
+        );
+        assert_eq!(
+            compose_stem(NoteTitleSource::FirstLineDate, NoteDateFormat::Dmy, title, ts),
+            "Einkaufsliste 28.08.2026"
+        );
+    }
+
+    #[test]
+    fn datum_kommt_aus_der_lokalzeit() {
+        // 22:30 lokal: mit UTC statt Lokalzeit stünde östlich von Greenwich
+        // der 29. im Namen. Der Test schlägt fehl, sobald jemand
+        // `format_date` auf `Utc` umstellt — ausser die Maschine steht
+        // selbst auf UTC, wo die Frage nicht existiert.
+        assert_eq!(format_date(NoteDateFormat::Ymd, zeitpunkt(22, 30)), "2026-08-28");
+        assert_eq!(
+            format_date(NoteDateFormat::YmdCompactHm, zeitpunkt(9, 5)),
+            "20260828-0905"
+        );
     }
 
     #[test]

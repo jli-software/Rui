@@ -7,7 +7,6 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Geplant für 0.2
-- Notiz-Titel und Autosave steuerbar (Titelquelle, Datumsformat, Verzögerung)
 - NeoVim-Steuerung, abschaltbar — Normal-/Insert-/Visual-Modus
 - Shortcut-Übersicht in den Einstellungen
 - Tabs (Puffer-Modell in `types.ts` ist vorbereitet)
@@ -18,6 +17,44 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.1.3] — 2026-08-28
+
+### Hinzugefügt
+- Der Dateiname einer Notiz lässt sich jetzt zusammensetzen: erste Zeile,
+  Datum, „Datum, dann erste Zeile" oder „erste Zeile, dann Datum". Ist die
+  erste Zeile leer, springt überall das Datum ein — eine Notiz ohne Namen
+  liesse sich sonst gar nicht anlegen.
+- Datumsformat wählbar (`2026-08-28`, `2026-08-28 1423`, `20260828`,
+  `20260828-1423`, `28.08.2026`). Vorgaben statt eines freien Musters: ein
+  vertippter Formatstring erzeugt still danebenliegende Dateinamen, und ein
+  Dateiname lässt sich nicht so leicht zurücknehmen wie eine Anzeige.
+- Die Autosave-Verzögerung ist einstellbar (vorher fest 500 ms).
+
+### Geändert
+- Die Datumsnamen rechnen in **Lokalzeit** statt in UTC — dafür ist `chrono`
+  dazugekommen, das über tauri ohnehin schon im Abhängigkeitsbaum lag. Eine
+  Notiz, die um 23:30 entsteht, trug bisher das Datum des nächsten Tages im
+  Namen, und ein Dateiname lässt sich schlechter korrigieren als eine
+  Anzeige.
+- Das Datum im Namen wird beim Anlegen der Notiz festgehalten, nicht bei
+  jedem Speichern neu berechnet. Sonst wanderte eine Notiz, deren Titel man
+  kurz nach Mitternacht ändert, auf den neuen Tag.
+- Namenlose Notizen heissen nur noch nach dem Datum, ohne das
+  vorangestellte „Notiz " — der Ordner sagt schon, dass es eine ist, und
+  ein fest eingebautes deutsches Wort steht der Lokalisierung im Weg.
+
+### Behoben
+- Eine von Rui selbst benannte Notiz galt nach einem Neustart als von Hand
+  geöffnet und wurde nie wieder umbenannt, obwohl sich ihre erste Zeile
+  änderte. Die Sitzung merkt sich das jetzt.
+- Die beiden Tests in `decoration.rs` teilten sich `RUI_DECORATION`, eine
+  prozessweite Umgebungsvariable, liefen aber parallel in Threads. Der
+  zweite sah gelegentlich die Variable des ersten und schlug scheinbar
+  grundlos fehl. Sie wechseln sich jetzt ab.
+- `cargo clippy` ist wieder ohne Warnungen: fünf handgeschriebene
+  `Default`-Implementierungen sind durch `#[derive(Default)]` mit
+  `#[default]` ersetzt.
 
 ## [0.1.2] — 2026-08-28
 
@@ -78,7 +115,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.2...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/vikingjunior12/Rui/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/vikingjunior12/Rui/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.1
 [0.1.0]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.0
