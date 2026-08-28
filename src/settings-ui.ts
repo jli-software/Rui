@@ -53,6 +53,9 @@ const VIM_SHORTCUTS: ShortcutDef[] = [
   { title: "Rückgängig / wiederholen", shortcut: "u / Strg+R" },
   { title: "Suchen / weiter / zurück", shortcut: "/ / n / N" },
   { title: "Speichern / schliessen / beides", shortcut: ":w / :q / :wq" },
+  { title: "Unter einem Namen speichern", shortcut: ":w name.ps1" },
+  { title: "Datei öffnen / neu laden", shortcut: ":e pfad / :e" },
+  { title: "Schliessen ohne zu speichern", shortcut: ":q!" },
 ];
 
 /**
@@ -136,7 +139,7 @@ const SECTIONS: Section[] = [
         key: "vimMode",
         type: "bool",
         label: "Vim-Steuerung",
-        hint: "Normal-, Insert- und Visual-Modus, hjkl, :w und :q. Der Modus steht links in der Statusleiste",
+        hint: "Normal-, Insert- und Visual-Modus, hjkl, :w, :e und :q. Der Modus steht links in der Statusleiste",
       },
     ],
   },
@@ -176,13 +179,33 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    title: "Autosave",
+    fields: [
+      {
+        key: "autosave",
+        type: "bool",
+        label: "Änderungen automatisch speichern",
+        hint: "Aus gutem Grund standardmässig aus: Wer eine Konfiguration nur nachschlägt, verändert sie sonst mit einem versehentlichen Tastendruck. Gespeichert wird mit Strg+S, im Vim-Modus mit :w",
+      },
+      {
+        key: "autosaveDelayMs",
+        type: "number",
+        label: "Autosave nach (ms)",
+        hint: "Wartezeit nach dem letzten Tastendruck — nur wirksam, wenn Autosave an ist",
+        min: 100,
+        max: 5000,
+        step: 100,
+      },
+    ],
+  },
+  {
     title: "Notizen",
     fields: [
       {
         key: "notesFolder",
         type: "folder",
         label: "Notizen-Ordner",
-        hint: "Ist ein Ordner gesetzt, speichert Rui jede Notiz laufend selbst — kein Strg+S nötig. Neue Notizen werden nach ihrer ersten Zeile benannt.",
+        hint: "Wohin Strg+S einen noch namenlosen Puffer legt, ohne nach dem Ort zu fragen. Einen eigenen Namen gibt :w name.ps1 oder Speichern unter",
       },
       {
         key: "noteExtension",
@@ -194,22 +217,10 @@ const SECTIONS: Section[] = [
         ],
       },
       {
-        key: "noteTitleSource",
-        type: "select",
-        label: "Dateiname aus",
-        hint: "Ist die erste Zeile leer, springt überall das Datum ein",
-        options: [
-          ["first-line", "Erste Zeile"],
-          ["date", "Datum"],
-          ["date-first-line", "Datum, dann erste Zeile"],
-          ["first-line-date", "Erste Zeile, dann Datum"],
-        ],
-      },
-      {
         key: "noteDateFormat",
         type: "select",
-        label: "Datumsformat",
-        hint: "Lokalzeit, festgehalten beim Anlegen der Notiz",
+        label: "Datumsformat für den Dateinamen",
+        hint: "Lokalzeit, festgehalten beim Anlegen des Puffers",
         options: [
           ["ymd", "2026-08-28"],
           ["ymd-hm", "2026-08-28 1423"],
@@ -217,15 +228,6 @@ const SECTIONS: Section[] = [
           ["ymd-compact-hm", "20260828-1423"],
           ["dmy", "28.08.2026"],
         ],
-      },
-      {
-        key: "instantSaveDelayMs",
-        type: "number",
-        label: "Autosave nach (ms)",
-        hint: "Wartezeit nach dem letzten Tastendruck",
-        min: 100,
-        max: 5000,
-        step: 100,
       },
     ],
   },

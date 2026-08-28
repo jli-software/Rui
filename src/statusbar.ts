@@ -99,7 +99,13 @@ export class StatusBar {
     this.settings.addEventListener("click", actions.onSettings);
   }
 
-  update(info: StatusInfo, buffer: Buffer, languageName: string, modified: boolean) {
+  update(
+    info: StatusInfo,
+    buffer: Buffer,
+    languageName: string,
+    modified: boolean,
+    autosave: boolean,
+  ) {
     this.position.textContent = `Z ${info.line}, Sp ${info.column}`;
 
     if (info.selections > 1) {
@@ -116,6 +122,10 @@ export class StatusBar {
 
     const marks: string[] = [];
     if (buffer.readOnly) marks.push("Schreibgeschützt");
+    // Nur der eingeschaltete Zustand wird angezeigt: Autosave aus ist die
+    // Vorgabe und braucht keinen Hinweis, Autosave an dagegen schon —
+    // dann schreibt Rui die Datei, ohne dass jemand Strg+S gedrückt hat.
+    if (autosave) marks.push("Autosave");
     if (modified) marks.push("Geändert");
     this.flags.textContent = marks.join(" · ");
     this.flags.classList.toggle("is-modified", modified);

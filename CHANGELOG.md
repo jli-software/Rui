@@ -7,9 +7,12 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Geplant für 0.3 — Slices in dieser Reihenfolge
-- Standard-Editor unter Windows: Endungen erweitern, Registrier-Knopf
-- Vim: Tastenkonflikte auflösen, `:e`, `:set` auf Ruis Einstellungen
-- Einstellungen zusätzlich auf `Strg+Umschalt+I`
+- System-Zwischenablage: `"+y` / `"+p` und `Strg+Umschalt+C` / `Strg+Umschalt+V`
+- Syntaxhervorhebung für PowerShell und Shell mehr auffächern
+- Einstellungen zusätzlich auf `Strg+I`
+- Standard-Editor unter Windows: Endungen erweitern, Registrier-Knopf,
+  `rui <datei>` im Terminal
+- Vim: Tastenkonflikte auflösen, `:set` auf Ruis Einstellungen
 
 ### Geplant für 0.4
 - Tabs (Puffer-Modell in `types.ts` ist vorbereitet)
@@ -20,6 +23,43 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.2.3] — 2026-08-28
+
+### Geändert
+- **Autosave ist standardmässig aus und hängt nicht mehr am
+  Notizen-Ordner.** Bisher schrieb Rui jeden offenen Puffer alle 500 ms
+  zurück, sobald irgendwo ein Notizen-Ordner eingestellt war — auch das
+  PowerShell-Profil, das man nur nachschlagen wollte. Ein versehentlicher
+  Tastendruck stand damit sofort auf der Platte. Gespeichert wird jetzt von
+  Hand: `Strg+S`, im Vim-Modus `:w`. Autosave ist eine eigene Einstellung,
+  die man selbst einschaltet.
+- Ist Autosave an, steht das in der Statusleiste. Eine Datei, die ohne
+  `Strg+S` geschrieben wird, soll man sehen können.
+- **Dateinamen kommen nicht mehr aus der ersten Zeile.** Beim Scripting
+  steht dort ein Shebang oder ein `#Requires`, und eine Datei, die sich beim
+  Tippen selbst umbenennt, ist keine, mit der man arbeiten kann. Ein
+  namenloser Puffer bekommt im Notizen-Ordner einen Namen aus dem Datum —
+  einmal, und danach nie wieder einen anderen.
+- Die Einstellungen haben dafür einen eigenen Abschnitt **Autosave**; der
+  Abschnitt **Notizen** beschreibt jetzt, was er wirklich tut. Die
+  Einstellung „Dateiname aus" ist entfallen.
+
+### Hinzugefügt
+- **`:w <name>` benennt einen Puffer**, wie in NeoVim: `:w profil.ps1`,
+  `:w ~/scripts/x.sh`, absolute Pfade. Ein relativer Name gilt gegen den
+  Ordner der offenen Datei, sonst gegen den Notizen-Ordner. Ein bestehendes
+  Ziel wird nicht wortlos überschrieben, sondern erfragt. Seit die erste
+  Zeile keine Namen mehr vergibt, ist das der Weg, einen zu setzen.
+- `:saveas` als Synonym, `:wq <name>` und `:x <name>` ebenso.
+- **`:e <pfad>`** öffnet eine Datei, `:e` ohne Argument lädt die aktuelle neu,
+  `:e!` verwirft dabei ungespeicherte Änderungen. Ein Pfad, den es noch nicht
+  gibt, legt einen Puffer für diesen Namen an — geschrieben wird er mit `:w`.
+- Befehl **Autosave** in der Palette, mit dem Zustand daneben.
+
+### Behoben
+- `:q!` erkannte das Ausrufezeichen auch mitten im Argument. `:w foo!.txt`
+  schreibt jetzt eine Datei, die so heisst, statt etwas zu erzwingen.
 
 ## [0.2.2] — 2026-08-28
 
@@ -255,7 +295,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.2.2...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/vikingjunior12/Rui/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/vikingjunior12/Rui/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/vikingjunior12/Rui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/vikingjunior12/Rui/compare/v0.1.6...v0.2.0

@@ -39,15 +39,19 @@ checksum published with each release if you want to be sure of what you got.
   the status bar.
 - **Crash-safe writes** — saving goes through a temporary neighbouring file
   followed by a rename, so a crash mid-save cannot destroy your file
-- **Notes folder with instant save** — see below
+- **Manual saving by default** — Rui never writes a file you did not ask it
+  to. Autosave exists, but it is a setting you turn on, not something a notes
+  folder switches on behind your back. See below.
+- **Notes folder** for buffers that do not have a name yet — see below
 - **Quick Open** (`Ctrl+O`) lists every text file in the notes folder — notes,
   scripts, source files and logs alike — newest first, with fuzzy filtering
   and full keyboard navigation
 - **Vim keybindings**, off by default and switchable from the settings —
   normal, insert, visual and replace mode, with the current one shown on the
-  left of the status bar. `:w`, `:wq`, `:x` and `:q` go through Rui's own
-  save and close, so encoding and line endings survive them. The whole thing
-  is a lazy chunk: leave it off and it never loads.
+  left of the status bar. `:w`, `:w <name>`, `:wq`, `:x`, `:saveas`, `:e` and
+  `:q` go through Rui's own save, open and close, so encoding and line endings
+  survive them. The whole thing is a lazy chunk: leave it off and it never
+  loads.
 - **Shortcut reference** inside the settings, split into Rui's always-active
   shortcuts and the essential Vim motions and commands.
 - **Sage colour palette**, light and dark, plus automatic
@@ -73,11 +77,51 @@ plus a compact Vim reference, is available under **Settings → Keyboard**.
 
 Everything else lives in the command palette.
 
-## Notes folder (instant save)
+## Saving
 
-Pick a notes folder in the settings and Rui keeps every open buffer saved on
-its own from then on — half a second after the last keystroke by default, no
-`Ctrl+S` needed. That delay is a setting.
+**Rui saves when you tell it to, and not before.** `Ctrl+S`, or `:w` with Vim
+keybindings on. Open a file to read it, brush a key by accident, close the
+window — the file on disk is untouched. An editor you cannot trust while
+merely reading a config file is not usable as an editor.
+
+Autosave is a setting, off by default. Turn it on and Rui writes the buffer
+back half a second after the last keystroke (that delay is a setting too).
+While it is on, the status bar says **Autosave**, because a file being written
+without anyone pressing `Ctrl+S` is worth knowing about.
+
+Autosave deliberately runs **without** the save transforms
+(`trimTrailingWhitespace` / `ensureFinalNewline`) — those would wipe out a
+space you just typed, mid-sentence. They stay reserved for explicit saves.
+
+### Naming a file
+
+A buffer that has no name yet gets one the way Vim does it:
+
+```
+:w profile.ps1        next to the file you currently have open
+:w ~/scripts/x.sh     ~ is your home directory
+:w C:	emp
+otes.md   absolute paths work as given
+:e other.ps1          open a sibling — or start a new buffer for that name
+```
+
+A relative name resolves against the folder of the open file, falling back to
+the notes folder. Writing to a name that already exists asks first. Rui does
+**not** derive filenames from the first line of the text any more: when you
+are scripting, the first line is a shebang or a `#Requires`, and a file that
+renames itself while you type is not a file you can work with.
+
+Without Vim keybindings, `Ctrl+Shift+S` opens the ordinary save dialog.
+
+## Notes folder
+
+Pick a notes folder in the settings and `Ctrl+S` on an unnamed buffer puts it
+there without asking for a location — named after the date, and never renamed
+afterwards. The date format is a setting: `2026-08-28 1423`, `20260828-1423`,
+`28.08.2026` and so on. It uses **local time**, fixed at the moment the buffer
+was created, so a note begun at 23:58 is not dated tomorrow. Collisions
+resolve the way Finder and Explorer do it, with an appended counter —
+`Name (2).md` and so on.
 
 `Ctrl+O` opens Rui's own file picker for this folder. It searches recursively,
 starts with the most recently changed files, and is fully usable with typing,
@@ -96,36 +140,6 @@ Everything Rui can highlight, it can also find: `.txt`, `.md`, `.ps1`, `.sh`,
 log files — including rotated ones such as `deploy.log.3`. Build output stays
 out of the way: `node_modules`, `target`, `dist`, `build`, `bin`, `obj` and
 dot-folders like `.git` are skipped.
-
-A new, still unnamed note takes its filename from the first line (whitespace
-becomes `_`, forbidden characters are dropped) and lands in that folder
-automatically; if the first line changes later, the file is renamed along with
-it. An entirely empty first line leaves an already named note alone.
-Collisions resolve the way Finder and Explorer do it, with an appended
-counter — `Name (2).md` and so on.
-
-What the name is built from is up to you:
-
-| Setting | Result |
-|---|---|
-| First line | `Shopping_list.md` |
-| Date | `2026-08-28 1423.md` |
-| Date, then first line | `2026-08-28 1423 Shopping_list.md` |
-| First line, then date | `Shopping_list 2026-08-28 1423.md` |
-
-Whenever the first line is empty, the date stands in for it. The date format
-is a setting too — `2026-08-28`, `20260828-1423`, `28.08.2026` and so on. It
-uses **local time**, fixed at the moment the note was created: a note written
-at 23:30 is not dated tomorrow, and renaming it next week does not re-date
-it.
-
-Instant save deliberately runs **without** the save transforms
-(`trimTrailingWhitespace` / `ensureFinalNewline`) — those would wipe out a
-space you just typed, mid-sentence. They stay reserved for explicit saves.
-
-While the folder is set this applies to ordinary files too: a normally opened
-file is also saved continuously, but never renamed — renaming only happens for
-notes Rui named itself.
 
 ## Settings
 

@@ -53,7 +53,7 @@ class App {
   /** Sprache, die der Nutzer von Hand gewählt hat; überschreibt die Erkennung. */
   private languageOverride: string | null = null;
   private sessionTimer: number | undefined;
-  private instantSaveTimer: number | undefined;
+  private autosaveTimer: number | undefined;
   private closing = false;
 
   async start() {
@@ -71,9 +71,10 @@ class App {
         onVimMode: (status) => this.status.setVimMode(status),
       },
       {
-        // `:w` und `:q` laufen über Ruis eigene Wege — sonst schriebe Vim
-        // an `document.rs` vorbei und damit am Encoding der Datei.
-        write: () => this.save(),
+        // `:w`, `:e` und `:q` laufen über Ruis eigene Wege — sonst schriebe
+        // Vim an `document.rs` vorbei und damit am Encoding der Datei.
+        write: (target) => this.save(target),
+        edit: (target, force) => this.edit(target, force),
         quit: (force) => void this.quit(force),
       },
     );
@@ -162,7 +163,6 @@ class App {
       mtimeMs: 0,
       savedContent: "",
       createdAtMs: Date.now(),
-      autoNamed: false,
     };
   }
 
@@ -178,11 +178,17 @@ class App {
   private onChanged() {
     this.refreshStatus();
     this.scheduleSessionSave();
-    this.scheduleInstantSave();
+    this.scheduleAutosave();
   }
 
   private refreshStatus() {
-    this.status.update(this.editor.cursorInfo(), this.buffer, this.language.name, this.isModified);
+    this.status.update(
+      this.editor.cursorInfo(),
+      this.buffer,
+      this.language.name,
+      this.isModified,
+      this.settings.autosave,
+    );
     const mark = this.isModified ? "• " : "";
     const title = `${mark}${this.fileName} — Rui`;
     void getCurrentWindow().setTitle(title);
@@ -209,6 +215,9 @@ class App {
 
   private async newFile() {
     if (!(await this.confirmDiscard())) return;
+    // Ein ausstehender Autosave gehörte zum alten Puffer und hat jetzt
+    // kein Ziel mehr.
+    window.clearTimeout(this.autosaveTimer);
     this.buffer = this.emptyBuffer();
     this.languageOverride = null;
     this.editor.loadDocument("");
@@ -244,6 +253,7 @@ class App {
       return;
     }
 
+    window.clearTimeout(this.autosaveTimer);
     this.buffer = {
       path: doc.path,
       encoding: doc.encoding,
@@ -253,8 +263,6 @@ class App {
       mtimeMs: doc.mtimeMs,
       savedContent: doc.content,
       createdAtMs: Date.now(),
-      // Von Hand geöffnet — wird nie umbenannt, auch nicht im Notizen-Ordner.
-      autoNamed: false,
     };
     this.languageOverride = null;
     this.editor.loadDocument(doc.content);
@@ -263,9 +271,102 @@ class App {
     this.scheduleSessionSave();
   }
 
-  private async save(): Promise<boolean> {
-    if (!this.buffer.path) return this.saveAs();
-    return this.writeTo(this.buffer.path);
+  /**
+   * Speichern von Hand — Strg+S und `:w`.
+   *
+   * `target` ist das Argument aus `:w notiz.ps1`. Ohne Argument und ohne
+   * Dateinamen legt Rui den Puffer im Notizen-Ordner ab; gibt es auch den
+   * nicht, fragt der Dateidialog nach dem Ort. Ein Puffer wird nie
+   * gespeichert, ohne dass jemand danach gefragt hat: Genau das war der
+   * Fehler, den Autosave-an-Notizen-Ordner gemacht hat.
+   */
+  private async save(target?: string): Promise<boolean> {
+    if (target !== undefined) return this.saveTo(target);
+    if (this.buffer.path) return this.writeTo(this.buffer.path);
+    if (this.settings.notesFolder) return this.saveNote();
+    return this.saveAs();
+  }
+
+  /**
+   * `:w <name>` — den Namen wie Vim auflösen und dorthin schreiben.
+   *
+   * Ein bestehender Puffer folgt danach der neuen Datei; die alte bleibt
+   * unangetastet liegen. Das ist Vims Verhalten und das erwartbarste:
+   * `:w kopie.ps1` soll eine Kopie machen und nichts verschieben.
+   */
+  private async saveTo(target: string): Promise<boolean> {
+    let path: string;
+    try {
+      path = await invoke<string>("resolve_save_path", {
+        input: target,
+        base: parentFolder(this.buffer.path),
+        fallback: this.settings.notesFolder,
+      });
+    } catch (err) {
+      await message(String(err), { title: "Speichern fehlgeschlagen", kind: "error" });
+      return false;
+    }
+
+    // Eine fremde Datei nicht wortlos überschreiben — `:w!` gibt es in Rui
+    // (noch) nicht, also fragt Rui stattdessen.
+    if (path !== this.buffer.path && (await this.exists(path))) {
+      const overwrite = await ask(`"${shortName(path)}" gibt es bereits. Überschreiben?`, {
+        title: "Speichern",
+        kind: "warning",
+        okLabel: "Überschreiben",
+      });
+      if (!overwrite) return false;
+    }
+
+    const ok = await this.writeTo(path);
+    if (ok && !this.languageOverride) await this.setLanguage(detectLanguage(path));
+    return ok;
+  }
+
+  private async exists(path: string): Promise<boolean> {
+    try {
+      await invoke<number>("file_mtime", { path });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Einen namenlosen Puffer im Notizen-Ordner ablegen.
+   *
+   * Der Name kommt aus dem Datum — nicht mehr aus der ersten Zeile. Beim
+   * Scripting steht dort ein Shebang oder ein `#Requires`, und eine Datei,
+   * die sich beim Tippen selbst umbenennt, ist keine, mit der man
+   * arbeiten kann. Wer einen eigenen Namen will: `:w name.ps1`.
+   */
+  private async saveNote(): Promise<boolean> {
+    const folder = this.settings.notesFolder;
+    if (!folder) return this.saveAs();
+
+    this.applySaveTransforms();
+    try {
+      const result = await invoke<{ path: string; mtimeMs: number }>("save_note", {
+        folder,
+        extension: this.settings.noteExtension,
+        content: this.editor.content,
+        encoding: this.buffer.encoding,
+        bom: this.buffer.bom,
+        lineEnding: this.buffer.lineEnding,
+        dateFormat: this.settings.noteDateFormat,
+        createdAtMs: this.buffer.createdAtMs,
+      });
+      this.buffer.path = result.path;
+      this.buffer.mtimeMs = result.mtimeMs;
+      this.buffer.savedContent = this.editor.content;
+      this.refreshStatus();
+      this.scheduleSessionSave();
+      if (!this.languageOverride) await this.setLanguage(detectLanguage(result.path));
+      return true;
+    } catch (err) {
+      await message(String(err), { title: "Speichern fehlgeschlagen", kind: "error" });
+      return false;
+    }
   }
 
   private async saveAs(): Promise<boolean> {
@@ -275,10 +376,47 @@ class App {
     });
     if (!target) return false;
     const ok = await this.writeTo(target);
-    // Von Hand benannt — wird ab jetzt nicht mehr automatisch umbenannt.
-    if (ok) this.buffer.autoNamed = false;
     if (ok && !this.languageOverride) await this.setLanguage(detectLanguage(target));
     return ok;
+  }
+
+  /**
+   * `:e <pfad>` — eine Datei öffnen; ohne Pfad die aktuelle neu laden.
+   *
+   * `:e!` verwirft ungespeicherte Änderungen ohne Rückfrage, wie in Vim.
+   */
+  private async edit(target: string | undefined, force: boolean) {
+    if (target === undefined) {
+      if (!this.buffer.path) return;
+      if (!force && !(await this.confirmDiscard())) return;
+      await this.openPath(this.buffer.path, true);
+      return;
+    }
+
+    let path: string;
+    try {
+      path = await invoke<string>("resolve_save_path", {
+        input: target,
+        base: parentFolder(this.buffer.path),
+        fallback: this.settings.notesFolder,
+      });
+    } catch (err) {
+      await message(String(err), { title: "Öffnen fehlgeschlagen", kind: "error" });
+      return;
+    }
+
+    // Wie in Vim: `:e neue-datei.ps1` legt einen Puffer für einen Namen an,
+    // den es noch nicht gibt. Geschrieben wird er erst mit `:w`.
+    if (!(await this.exists(path))) {
+      if (!force && !(await this.confirmDiscard())) return;
+      this.buffer = { ...this.emptyBuffer(), path };
+      this.languageOverride = null;
+      this.editor.loadDocument("");
+      this.editor.setReadOnly(false);
+      await this.setLanguage(detectLanguage(path));
+      return;
+    }
+    await this.openPath(path, force);
   }
 
   private async writeTo(path: string): Promise<boolean> {
@@ -365,67 +503,59 @@ class App {
     if (reload) await this.openPath(this.buffer.path, true);
   }
 
-  // ---- Notizen-Ordner (Instant-Save) -------------------------------------
+  // ---- Autosave ----------------------------------------------------------
 
-  private scheduleInstantSave() {
-    if (!this.settings.notesFolder) return;
-    window.clearTimeout(this.instantSaveTimer);
-    // Kurz gedrosselt statt bei jedem Tastendruck, aber kurz genug, dass es
-    // sich anfühlt, als würde einfach immer alles schon gespeichert sein.
-    this.instantSaveTimer = window.setTimeout(
-      () => void this.instantSave(),
-      this.settings.instantSaveDelayMs,
+  /**
+   * Autosave, und zwar nur wenn er ausdrücklich eingeschaltet ist.
+   *
+   * Vorher hing das Zurückschreiben am Notizen-Ordner: Wer einen gesetzt
+   * hatte, dessen geöffnete Dateien wurden alle 500 ms überschrieben —
+   * auch das PowerShell-Profil, das er nur nachschlagen wollte. Ein
+   * versehentlicher Tastendruck stand damit sofort auf der Platte.
+   */
+  private scheduleAutosave() {
+    if (!this.settings.autosave) return;
+    window.clearTimeout(this.autosaveTimer);
+    this.autosaveTimer = window.setTimeout(
+      () => void this.autosave(),
+      this.settings.autosaveDelayMs,
     );
   }
 
-  private async instantSave() {
-    const folder = this.settings.notesFolder;
-    if (!folder) return;
+  private async autosave() {
+    if (!this.settings.autosave || this.buffer.readOnly) return;
 
     const content = this.editor.content;
     if (content === this.buffer.savedContent) return;
+
+    // Ein namenloser Puffer bekommt hier keinen Dialog vorgesetzt: Ein
+    // Speichern-unter-Fenster, das ungefragt aufspringt, während man
+    // tippt, wäre schlimmer als gar kein Autosave. Ohne Notizen-Ordner
+    // wartet der Puffer deshalb auf Strg+S.
+    if (!this.buffer.path) {
+      if (!this.settings.notesFolder || content.trim() === "") return;
+      await this.saveNote();
+      return;
+    }
 
     // Absichtlich ohne applySaveTransforms(): das Aufräumen verändert den
     // Text sichtbar und würde mitten im Tippen ein gerade eingegebenes
     // Leerzeichen wieder wegputzen. Das bleibt dem expliziten Speichern
     // vorbehalten.
     try {
-      if (this.buffer.path === null || this.buffer.autoNamed) {
-        if (this.buffer.path === null && content.trim() === "") return;
-
-        const wasUnnamed = this.buffer.path === null;
-        const result = await invoke<{ path: string; mtimeMs: number }>("save_note", {
-          currentPath: this.buffer.path,
-          folder,
-          title: content.split("\n")[0] ?? "",
-          extension: this.settings.noteExtension,
-          content,
-          encoding: this.buffer.encoding,
-          bom: this.buffer.bom,
-          lineEnding: this.buffer.lineEnding,
-          titleSource: this.settings.noteTitleSource,
-          dateFormat: this.settings.noteDateFormat,
-          createdAtMs: this.buffer.createdAtMs,
-        });
-        this.buffer.path = result.path;
-        this.buffer.autoNamed = true;
-        this.buffer.mtimeMs = result.mtimeMs;
-        if (wasUnnamed && !this.languageOverride) await this.setLanguage(detectLanguage(result.path));
-      } else {
-        this.buffer.mtimeMs = await invoke<number>("save_file", {
-          path: this.buffer.path,
-          content,
-          encoding: this.buffer.encoding,
-          bom: this.buffer.bom,
-          lineEnding: this.buffer.lineEnding,
-        });
-      }
+      this.buffer.mtimeMs = await invoke<number>("save_file", {
+        path: this.buffer.path,
+        content,
+        encoding: this.buffer.encoding,
+        bom: this.buffer.bom,
+        lineEnding: this.buffer.lineEnding,
+      });
       this.buffer.savedContent = content;
       this.refreshStatus();
     } catch (err) {
       // Keine Modal-Flut bei jedem Tastendruck — der nächste Tick
       // versucht es erneut, solange sich der Text weiter ändert.
-      console.error("Instant-Save fehlgeschlagen:", err);
+      console.error("Autosave fehlgeschlagen:", err);
     }
   }
 
@@ -449,7 +579,6 @@ class App {
       lineEnding: this.buffer.lineEnding,
       bom: this.buffer.bom,
       createdAtMs: this.buffer.createdAtMs,
-      autoNamed: this.buffer.autoNamed,
     };
     try {
       await invoke("save_session", { session });
@@ -475,11 +604,9 @@ class App {
       await this.openPath(session.path, true);
     }
     // Nach `openPath` gesetzt: das legt den Puffer neu an und würde die
-    // Entstehungszeit sonst auf jetzt und `autoNamed` auf false stellen.
-    // Ohne beides verlöre eine selbst benannte Notiz über den Neustart
-    // hinweg ihr Umbenennen und bekäme das Datum von heute.
+    // Entstehungszeit sonst auf jetzt stellen — ein gestern begonnener,
+    // noch namenloser Puffer bekäme dann das heutige Datum als Namen.
     if (session.createdAtMs) this.buffer.createdAtMs = session.createdAtMs;
-    this.buffer.autoNamed = session.autoNamed;
     if (session.unsavedContent !== null && session.unsavedContent !== undefined) {
       // Der ungespeicherte Stand gewinnt gegen den Dateiinhalt — sonst
       // wäre das Sicherheitsnetz nutzlos.
@@ -722,6 +849,13 @@ class App {
         run: () => this.saveAs(),
       },
       {
+        id: "file.autosave",
+        group: "Datei",
+        title: "Autosave",
+        state: () => (this.settings.autosave ? "an" : "aus"),
+        run: () => this.updateSettings({ ...this.settings, autosave: !this.settings.autosave }),
+      },
+      {
         id: "file.reveal",
         group: "Datei",
         title: "Im Dateimanager zeigen",
@@ -927,6 +1061,11 @@ class App {
 
     window.addEventListener("beforeunload", () => void this.saveSession());
   }
+}
+
+/** Nur der Dateiname, für Rückfragen, in denen der ganze Pfad stört. */
+function shortName(path: string): string {
+  return path.split(/[\/]/).pop() ?? path;
 }
 
 /** Der Ordner, in dem eine Datei liegt — `null` für einen leeren Puffer. */

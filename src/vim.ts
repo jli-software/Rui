@@ -19,12 +19,20 @@ export interface VimStatus {
 }
 
 /**
- * Was `:w` und `:q` auslösen sollen. Zeigt bewusst auf Ruis eigene
+ * Was `:w`, `:e` und `:q` auslösen sollen. Zeigt bewusst auf Ruis eigene
  * Wege und nicht auf die des Vim-Pakets.
  */
 export interface VimHost {
-  /** `:w` — speichert wie Strg+S. */
-  write: () => Promise<boolean>;
+  /**
+   * `:w` — speichert wie Strg+S.
+   *
+   * `target` ist das Argument aus `:w notiz.ps1`: ein relativer Name gilt
+   * gegen den Ordner der offenen Datei, wie in Vim. Ohne Argument und
+   * ohne Dateinamen fragt Rui nach dem Ort.
+   */
+  write: (target?: string) => Promise<boolean>;
+  /** `:e <pfad>` — öffnet eine Datei; ohne Argument lädt es die aktuelle neu. */
+  edit: (target: string | undefined, force: boolean) => Promise<void>;
   /** `:q`, mit `!` als `force` — schliesst wie das Fensterkreuz. */
   quit: (force: boolean) => void;
 }
@@ -80,32 +88,68 @@ const cursorTheme = Prec.highest(
   }),
 );
 
+/** Was das Vim-Paket einem Ex-Befehl über die eingetippte Zeile mitgibt. */
+interface ExParams {
+  argString?: string;
+  input?: string;
+  args?: string[];
+}
+
 /**
- * `:w`, `:wq`, `:x`, `:q` und `:qa` auf Ruis Speicher- und Schliessweg
- * legen.
+ * Das `!` aus `:q!`.
+ *
+ * Vim parst den Befehlsnamen als `\w+`, das Ausrufezeichen landet deshalb
+ * am Anfang des Arguments — nicht irgendwo darin: `:w foo!.txt` schreibt
+ * eine Datei, die so heisst, und erzwingt nichts.
+ */
+function forced(params: ExParams): boolean {
+  return argString(params).startsWith("!");
+}
+
+function argString(params: ExParams): string {
+  const raw = params.argString ?? params.args?.join(" ") ?? params.input ?? "";
+  return raw.trim();
+}
+
+/**
+ * Das Dateiargument eines Befehls — `undefined`, wenn keines dasteht.
+ * Ein führendes `!` gehört zum Befehl und nicht zum Namen.
+ */
+function target(params: ExParams): string | undefined {
+  const rest = argString(params).replace(/^!\s*/, "").trim();
+  return rest === "" ? undefined : rest;
+}
+
+/**
+ * `:w`, `:wq`, `:x`, `:e`, `:q` und `:qa` auf Ruis Speicher-, Öffnen- und
+ * Schliessweg legen.
  *
  * Ohne das schriebe Vim selbst — und damit an `document.rs` vorbei, das
  * das Encoding der geöffneten Datei erhält und das Zeilenende
  * wiederherstellt. Eine Windows-1252-Datei mit CRLF käme still als UTF-8
  * mit LF zurück.
+ *
+ * `:w <name>` ist hier mehr als Bequemlichkeit: Seit Rui Dateien nicht
+ * mehr nach ihrer ersten Zeile benennt, ist das der Weg, einem frischen
+ * Puffer einen Namen zu geben — genau wie in NeoVim.
  */
 function defineExCommands(host: VimHost) {
   if (exCommandsDefined) return;
   exCommandsDefined = true;
 
-  // Vim parst den Befehlsnamen als `\w+`, das `!` landet im Argument.
-  const forced = (params: { argString?: string; input?: string }) =>
-    (params.argString ?? params.input ?? "").includes("!");
-
-  const writeThenQuit = async () => {
+  const writeThenQuit = async (params: ExParams) => {
     // Nur schliessen, wenn das Speichern wirklich geklappt hat — sonst
     // wäre der Text weg, weil der Nutzer den Dialog abgebrochen hat.
-    if (await host.write()) host.quit(false);
+    if (await host.write(target(params))) host.quit(false);
   };
 
-  Vim.defineEx("write", "w", () => void host.write());
-  Vim.defineEx("wq", "wq", () => void writeThenQuit());
-  Vim.defineEx("xit", "x", () => void writeThenQuit());
+  Vim.defineEx("write", "w", (_cm, params) => void host.write(target(params)));
+  Vim.defineEx("wq", "wq", (_cm, params) => void writeThenQuit(params));
+  Vim.defineEx("xit", "x", (_cm, params) => void writeThenQuit(params));
+  // `:saveas` benennt den Puffer um — in Rui dasselbe wie `:w <name>`,
+  // weil ein geschriebener Puffer immer der geschriebenen Datei folgt.
+  Vim.defineEx("saveas", "sav", (_cm, params) => void host.write(target(params)));
+  Vim.defineEx("edit", "e", (_cm, params) => void host.edit(target(params), forced(params)));
   Vim.defineEx("quit", "q", (_cm, params) => host.quit(forced(params)));
   Vim.defineEx("qall", "qa", (_cm, params) => host.quit(forced(params)));
 }

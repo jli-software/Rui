@@ -122,6 +122,7 @@ pub fn run() {
             document::open_file,
             document::save_file,
             document::save_note,
+            document::resolve_save_path,
             document::file_mtime,
             quick_open::list_note_files,
             settings::load_settings,

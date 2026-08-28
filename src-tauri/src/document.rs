@@ -13,7 +13,7 @@ use std::time::UNIX_EPOCH;
 use chrono::{Local, TimeZone};
 use serde::{Deserialize, Serialize};
 
-use crate::settings::{NoteDateFormat, NoteTitleSource};
+use crate::settings::NoteDateFormat;
 
 /// Ab dieser Grösse wird nachgefragt, bevor geöffnet wird. Der Puffer lebt
 /// im Webview, darüber wird das Tippgefühl spürbar zäh.
@@ -227,17 +227,9 @@ pub fn save_file(
 /// oder dort nur Ärger machen.
 const FORBIDDEN_IN_NAMES: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
 
-/// Erste Zeile einer Notiz zu einem Dateinamen-Stamm machen: getrimmt,
-/// Leerraum zu `_`, verbotene und Steuerzeichen raus, auf 80 Zeichen
-/// gekappt. Leer heisst: kein Titel ableitbar.
-fn sanitize_title(title: &str) -> Option<String> {
-    let collapsed = title.split_whitespace().collect::<Vec<_>>().join("_");
-    sanitize_stem(&collapsed, 80)
-}
-
-/// Wie `sanitize_title`, aber ohne Leerraum zu Unterstrichen zu machen.
-/// Für den fertig zusammengesetzten Namen gedacht, in dem das Leerzeichen
-/// Datum und Titel voneinander trennt und deshalb erhalten bleiben muss.
+/// Einen Dateinamen-Stamm brauchbar machen: verbotene und Steuerzeichen
+/// raus, Punkte und Leerraum an den Rändern weg, auf `max` Zeichen gekappt.
+/// `None` heisst: davon bleibt nichts übrig.
 fn sanitize_stem(stem: &str, max: usize) -> Option<String> {
     let cleaned: String = stem
         .chars()
@@ -268,34 +260,6 @@ fn format_date(format: NoteDateFormat, created_at_ms: i64) -> String {
         .unwrap_or_else(Local::now)
         .format(format.pattern())
         .to_string()
-}
-
-/// Den Dateinamen-Stamm aus erster Zeile und Datum zusammensetzen.
-///
-/// `first_line` ist bereits durch `sanitize_title` gegangen, ist also
-/// entweder ein brauchbarer Stamm oder `None`. Das Datum steht immer zur
-/// Verfügung, deshalb kommt hier immer ein Name heraus — eine Notiz ohne
-/// Namen liesse sich sonst gar nicht erst anlegen.
-fn compose_stem(
-    source: NoteTitleSource,
-    date_format: NoteDateFormat,
-    first_line: Option<&str>,
-    created_at_ms: i64,
-) -> String {
-    let date = format_date(date_format, created_at_ms);
-    let combined = match (source, first_line) {
-        (NoteTitleSource::Date, _) | (_, None) => date.clone(),
-        (NoteTitleSource::FirstLine, Some(title)) => title.to_string(),
-        (NoteTitleSource::DateFirstLine, Some(title)) => format!("{date} {title}"),
-        (NoteTitleSource::FirstLineDate, Some(title)) => format!("{title} {date}"),
-    };
-
-    // Grosszügiger als die 80 Zeichen der ersten Zeile, weil hier noch das
-    // Datum dazukommt — aber gedeckelt, damit der Pfad nicht ausufert.
-    sanitize_stem(&combined, 120)
-        // Nur erreichbar, wenn selbst das Datum wegsaniert würde. Dann ist
-        // ein fester Name immer noch besser als eine verlorene Notiz.
-        .unwrap_or_else(|| "Notiz".to_string())
 }
 
 fn is_taken(path: &Path, keep: Option<&Path>) -> bool {
@@ -329,27 +293,27 @@ pub struct NoteSaveResult {
     pub mtime_ms: u64,
 }
 
-/// Speichert eine Notiz im Instant-Save-Modus: neue Puffer bekommen ihren
-/// Namen nach der eingestellten Titelquelle, bereits automatisch benannte
-/// Notizen werden bei Bedarf mitverschoben. Eine Notiz, die von Hand
-/// geöffnet wurde (also nie über diesen Befehl entstand), landet nie hier —
-/// dafür bleibt `save_file` zuständig, ganz ohne Umbenennen.
+/// Legt einen noch namenlosen Puffer im Notizen-Ordner ab.
 ///
-/// `created_at_ms` ist die Entstehungszeit des Puffers, nicht „jetzt": in
-/// den Modi mit Datum im Namen würde eine Notiz sonst beim Umbenennen kurz
-/// nach Mitternacht auf den neuen Tag springen.
+/// Der Name kommt aus dem Datum und steht damit ab dem ersten Speichern
+/// fest. Aus der ersten Zeile wird er bewusst **nicht** mehr gebildet:
+/// Beim Scripting ist die erste Zeile ein Shebang, ein `#Requires` oder
+/// ein Kommentar, und eine Datei, die sich beim Tippen selbst umbenennt,
+/// ist keine Datei, mit der man arbeiten kann. Wer einen eigenen Namen
+/// will, nimmt `:w name.ps1` oder Speichern unter.
+///
+/// `created_at_ms` ist die Entstehungszeit des Puffers, nicht „jetzt":
+/// sonst spränge ein Puffer, der um 23:58 entstand und um 00:01
+/// gespeichert wird, auf den nächsten Tag.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub fn save_note(
-    current_path: Option<String>,
     folder: String,
-    title: String,
     extension: String,
     content: String,
     encoding: String,
     bom: bool,
     line_ending: LineEnding,
-    title_source: NoteTitleSource,
     date_format: NoteDateFormat,
     created_at_ms: i64,
 ) -> Result<NoteSaveResult, String> {
@@ -358,41 +322,11 @@ pub fn save_note(
         return Err(format!("{folder} ist kein Ordner (mehr)."));
     }
 
-    let current = current_path.as_ref().map(PathBuf::from);
-    let first_line = sanitize_title(&title);
-
-    let target = match (&first_line, &current) {
-        // Erste Zeile gerade leer (z. B. Text markiert, um ihn zu ersetzen):
-        // Namen der bestehenden Notiz nicht wegen eines Zwischenzustands
-        // wechseln. Gilt auch in den Datums-Modi — dort käme derselbe Name
-        // heraus, aber die Regel soll nicht von der Einstellung abhängen.
-        (None, Some(cur)) => cur.clone(),
-        _ => {
-            let stem = compose_stem(
-                title_source,
-                date_format,
-                first_line.as_deref(),
-                created_at_ms,
-            );
-            match &current {
-                Some(cur) => {
-                    let cur_stem = cur.file_stem().map(|s| s.to_string_lossy().into_owned());
-                    if cur_stem.as_deref() == Some(stem.as_str()) {
-                        cur.clone()
-                    } else {
-                        unique_note_path(&folder_buf, &stem, &extension, Some(cur.as_path()))
-                    }
-                }
-                None => unique_note_path(&folder_buf, &stem, &extension, None),
-            }
-        }
-    };
-
-    if let Some(cur) = &current {
-        if cur != &target && cur.exists() {
-            fs::rename(cur, &target).map_err(|e| format!("{}: {e}", cur.display()))?;
-        }
-    }
+    let stem = sanitize_stem(&format_date(date_format, created_at_ms), 120)
+        // Nur erreichbar, wenn selbst das Datum wegsaniert würde. Dann ist
+        // ein fester Name immer noch besser als eine verlorene Notiz.
+        .unwrap_or_else(|| "Notiz".to_string());
+    let target = unique_note_path(&folder_buf, &stem, &extension, None);
 
     let bytes = encode_with_endings(content, &encoding, bom, line_ending)?;
     let mtime_ms = write_atomic(&target, &bytes)?;
@@ -401,6 +335,66 @@ pub fn save_note(
         path: target.to_string_lossy().into_owned(),
         mtime_ms,
     })
+}
+
+/// Löst ein Ziel aus `:w <pfad>` zu einem absoluten Pfad auf.
+///
+/// Wie in Vim: Ein relativer Pfad gilt gegen das Verzeichnis der offenen
+/// Datei, `~` gegen das Benutzerverzeichnis. Fehlt beides — ein frischer,
+/// namenloser Puffer —, springt `fallback` ein (der Notizen-Ordner).
+///
+/// Ein Ziel, dessen Verzeichnis es nicht gibt, wird hier abgelehnt statt
+/// erst beim Schreiben: `:w tsets/x.ps1` soll sich melden, nicht still
+/// nichts tun.
+#[tauri::command]
+pub fn resolve_save_path(
+    input: String,
+    base: Option<String>,
+    fallback: Option<String>,
+) -> Result<String, String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Err("Kein Dateiname angegeben.".to_string());
+    }
+
+    let expanded = match trimmed.strip_prefix('~') {
+        Some(rest) => {
+            let home = dirs_home().ok_or("Kein Benutzerverzeichnis gefunden.")?;
+            home.join(rest.trim_start_matches(['/', '\\']))
+        }
+        None => PathBuf::from(trimmed),
+    };
+
+    let absolute = if expanded.is_absolute() {
+        expanded
+    } else {
+        let root = base
+            .map(PathBuf::from)
+            .or_else(|| fallback.map(PathBuf::from))
+            .or_else(dirs_home)
+            .ok_or("Kein Ordner, gegen den der Name gelten könnte.")?;
+        root.join(expanded)
+    };
+
+    if absolute.is_dir() {
+        return Err(format!("{} ist ein Verzeichnis.", absolute.display()));
+    }
+    match absolute.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() && !dir.is_dir() => {
+            return Err(format!("Den Ordner {} gibt es nicht.", dir.display()));
+        }
+        _ => {}
+    }
+
+    Ok(absolute.to_string_lossy().into_owned())
+}
+
+/// Das Benutzerverzeichnis, ohne dafür eine Abhängigkeit zu holen.
+fn dirs_home() -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .filter(|p| p.is_dir())
 }
 
 /// Prüft, ob die Datei seit dem Laden von aussen verändert wurde.
@@ -448,17 +442,6 @@ mod tests {
         assert_eq!(back.as_ref(), &bytes);
     }
 
-    #[test]
-    fn titel_wird_zu_dateinamen() {
-        assert_eq!(sanitize_title("Hallo wie gehts"), Some("Hallo_wie_gehts".to_string()));
-        assert_eq!(sanitize_title("  viel   Leerraum  "), Some("viel_Leerraum".to_string()));
-        assert_eq!(sanitize_title("a/b:c*d?e"), Some("abcde".to_string()));
-        assert_eq!(sanitize_title("   "), None);
-        assert_eq!(sanitize_title(""), None);
-        let lang = "x".repeat(200);
-        assert_eq!(sanitize_title(&lang).unwrap().chars().count(), 80);
-    }
-
     /// Ein fester Zeitpunkt in Lokalzeit, damit die Tests in jeder
     /// Zeitzone dasselbe erwarten dürfen.
     fn zeitpunkt(h: u32, min: u32) -> i64 {
@@ -469,46 +452,17 @@ mod tests {
     }
 
     #[test]
-    fn zusammengesetzter_name_behaelt_leerzeichen() {
-        // Der Unterstrich gilt nur innerhalb der ersten Zeile; das
-        // Leerzeichen trennt hier Datum und Titel und muss bleiben.
+    fn dateiname_behaelt_leerzeichen() {
+        // Das Leerzeichen zwischen Datum und Uhrzeit muss bleiben — nur
+        // die in Dateinamen verbotenen Zeichen fliegen raus.
         assert_eq!(
-            sanitize_stem("2026-08-28 Notiz", 120),
-            Some("2026-08-28 Notiz".to_string())
+            sanitize_stem("2026-08-28 1423", 120),
+            Some("2026-08-28 1423".to_string())
         );
         assert_eq!(sanitize_stem("a:b", 120), Some("ab".to_string()));
         assert_eq!(sanitize_stem("   ", 120), None);
         // Kürzen darf keinen Leerraum am Ende zurücklassen.
         assert_eq!(sanitize_stem("abc def", 4), Some("abc".to_string()));
-    }
-
-    #[test]
-    fn titel_wird_aus_quelle_und_datum_zusammengesetzt() {
-        let ts = zeitpunkt(14, 23);
-        let title = Some("Einkaufsliste");
-
-        assert_eq!(
-            compose_stem(NoteTitleSource::FirstLine, NoteDateFormat::Ymd, title, ts),
-            "Einkaufsliste"
-        );
-        // Ohne erste Zeile springt in jedem Modus das Datum ein.
-        assert_eq!(
-            compose_stem(NoteTitleSource::FirstLine, NoteDateFormat::Ymd, None, ts),
-            "2026-08-28"
-        );
-        // Im Datums-Modus hat die erste Zeile keinen Einfluss.
-        assert_eq!(
-            compose_stem(NoteTitleSource::Date, NoteDateFormat::YmdHm, title, ts),
-            "2026-08-28 1423"
-        );
-        assert_eq!(
-            compose_stem(NoteTitleSource::DateFirstLine, NoteDateFormat::Ymd, title, ts),
-            "2026-08-28 Einkaufsliste"
-        );
-        assert_eq!(
-            compose_stem(NoteTitleSource::FirstLineDate, NoteDateFormat::Dmy, title, ts),
-            "Einkaufsliste 28.08.2026"
-        );
     }
 
     #[test]
@@ -539,5 +493,40 @@ mod tests {
         assert_eq!(kept, own);
 
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn relativer_name_gilt_gegen_den_ordner_der_offenen_datei() {
+        let dir = std::env::temp_dir();
+        let base = dir.to_string_lossy().into_owned();
+
+        // `:w notiz.ps1` neben der offenen Datei.
+        let ziel = resolve_save_path("notiz.ps1".into(), Some(base.clone()), None).unwrap();
+        assert_eq!(PathBuf::from(&ziel).parent().unwrap(), dir.as_path());
+        assert!(ziel.ends_with("notiz.ps1"));
+
+        // Ohne offene Datei springt der Notizen-Ordner ein.
+        let ziel = resolve_save_path("notiz.ps1".into(), None, Some(base)).unwrap();
+        assert_eq!(PathBuf::from(&ziel).parent().unwrap(), dir.as_path());
+    }
+
+    #[test]
+    fn absoluter_pfad_bleibt_unangetastet() {
+        let ziel = std::env::temp_dir().join("rui-absolut.txt");
+        let text = ziel.to_string_lossy().into_owned();
+        assert_eq!(
+            resolve_save_path(text.clone(), Some("/anderswo".into()), None).unwrap(),
+            text
+        );
+    }
+
+    #[test]
+    fn nicht_vorhandener_ordner_wird_gemeldet() {
+        let base = std::env::temp_dir().to_string_lossy().into_owned();
+        // Ein Tippfehler im Ordner darf nicht still ins Leere schreiben.
+        let fehler = resolve_save_path("gibt-es-nicht/x.ps1".into(), Some(base), None);
+        assert!(fehler.is_err(), "fehlender Ordner muss ein Fehler sein");
+        // Leerer Name ebenso — `:w` ohne Argument geht einen anderen Weg.
+        assert!(resolve_save_path("   ".into(), None, None).is_err());
     }
 }

@@ -32,23 +32,6 @@ pub enum NoteExtension {
     Txt,
 }
 
-/// Woraus der Dateiname einer selbst benannten Notiz entsteht.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum NoteTitleSource {
-    /// Erste Zeile. Solange sie leer ist, springt das Datum ein — ohne
-    /// Namen könnte die Notiz sonst gar nicht erst angelegt werden.
-    #[default]
-    FirstLine,
-    /// Immer das Datum. Der Name steht damit ab dem ersten Tastendruck
-    /// fest und ändert sich nie wieder.
-    Date,
-    /// Datum, dann erste Zeile: `2026-08-28 1423 Einkaufsliste`.
-    DateFirstLine,
-    /// Erste Zeile, dann Datum: `Einkaufsliste 2026-08-28 1423`.
-    FirstLineDate,
-}
-
 /// Vorgaben statt eines freien Musters: ein vertippter Formatstring würde
 /// still danebenliegende Dateinamen erzeugen, und ein Dateiname lässt sich
 /// nicht so leicht zurücknehmen wie eine Anzeige.
@@ -131,18 +114,30 @@ pub struct Settings {
     pub watch_external_changes: bool,
     pub confirm_on_close: bool,
 
+    // --- Speichern ---
+    /// Schreibt den Puffer nach jeder Änderung von selbst zurück.
+    ///
+    /// **Standardmässig aus, und das ist die wichtigste Vorgabe dieser
+    /// Datei.** Wer ein PowerShell-Profil oder eine Konfiguration nur
+    /// nachschlagen will, tippt beim Scrollen leicht ein Zeichen hinein —
+    /// mit Autosave stünde es sofort auf der Platte. Ein Editor, dem man
+    /// beim Lesen nicht trauen kann, ist als Editor unbrauchbar.
+    /// Gespeichert wird deshalb von Hand: Strg+S oder `:w`.
+    pub autosave: bool,
+    /// Wartezeit nach dem letzten Tastendruck, bevor Autosave zuschlägt.
+    /// Nur wirksam, wenn `autosave` an ist.
+    pub autosave_delay_ms: u32,
+
     // --- Notizen ---
-    /// Ist ein Ordner gesetzt, speichert Rui jeden offenen Puffer laufend
-    /// selbst — ganz ohne Strg+S. Neue, noch namenlose Notizen werden aus
-    /// ihrer ersten Zeile benannt und landen automatisch in diesem Ordner.
+    /// Wohin ein namenloser Puffer kommt, wenn er ohne Dateidialog
+    /// gespeichert wird. Ist keiner gesetzt, fragt Rui nach dem Ort.
+    ///
+    /// Löst kein Autosave mehr aus: Notizen-Ordner und Autosave sind zwei
+    /// verschiedene Fragen, und sie zu koppeln hat aus jedem geöffneten
+    /// Script eine Notiz gemacht.
     pub notes_folder: Option<String>,
     pub note_extension: NoteExtension,
-    pub note_title_source: NoteTitleSource,
     pub note_date_format: NoteDateFormat,
-    /// Wartezeit nach dem letzten Tastendruck, bevor gespeichert wird.
-    /// Kurz genug, dass es sich anfühlt, als wäre immer schon gespeichert;
-    /// lang genug, dass nicht jeder Buchstabe die Platte anfasst.
-    pub instant_save_delay_ms: u32,
 
     // --- Quick Open ---
     /// Weitere Ordner, die `Strg+O` neben dem Notizen-Ordner durchsucht.
@@ -187,11 +182,12 @@ impl Default for Settings {
             watch_external_changes: true,
             confirm_on_close: true,
 
+            autosave: false,
+            autosave_delay_ms: 500,
+
             notes_folder: None,
             note_extension: NoteExtension::Md,
-            note_title_source: NoteTitleSource::FirstLine,
             note_date_format: NoteDateFormat::YmdHm,
-            instant_save_delay_ms: 500,
 
             search_folders: Vec::new(),
             search_open_file_folder: true,
@@ -218,14 +214,10 @@ pub struct Session {
     pub encoding: Option<String>,
     pub line_ending: Option<LineEnding>,
     pub bom: bool,
-    /// Entstehungszeit des Puffers (Epoche in ms). Ohne sie bekäme eine
-    /// gestern angelegte Notiz nach dem Neustart beim nächsten Umbenennen
-    /// das heutige Datum in den Namen.
+    /// Entstehungszeit des Puffers (Epoche in ms). Ohne sie bekäme ein
+    /// gestern angelegter, noch namenloser Puffer nach dem Neustart das
+    /// heutige Datum in den Dateinamen.
     pub created_at_ms: Option<i64>,
-    /// Ob Rui die Notiz selbst benannt hat. Ohne dieses Feld galt sie nach
-    /// einem Neustart als von Hand geöffnet und wurde nie wieder
-    /// umbenannt, obwohl sich ihre erste Zeile änderte.
-    pub auto_named: bool,
 }
 
 fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -287,11 +279,6 @@ mod tests {
     /// klaglos den Standardwert einsetzt statt zu meckern.
     #[test]
     fn enum_namen_stimmen_mit_dem_frontend_ueberein() {
-        assert_eq!(name(&NoteTitleSource::FirstLine), "first-line");
-        assert_eq!(name(&NoteTitleSource::Date), "date");
-        assert_eq!(name(&NoteTitleSource::DateFirstLine), "date-first-line");
-        assert_eq!(name(&NoteTitleSource::FirstLineDate), "first-line-date");
-
         assert_eq!(name(&NoteDateFormat::Ymd), "ymd");
         assert_eq!(name(&NoteDateFormat::YmdHm), "ymd-hm");
         assert_eq!(name(&NoteDateFormat::YmdCompact), "ymd-compact");
@@ -318,9 +305,21 @@ mod tests {
 
         assert_eq!(s.theme, Theme::SageDark);
         assert_eq!(s.notes_folder.as_deref(), Some("/tmp/notizen"));
-        assert_eq!(s.note_title_source, NoteTitleSource::FirstLine);
         assert_eq!(s.note_date_format, NoteDateFormat::YmdHm);
-        assert_eq!(s.instant_save_delay_ms, 500);
+        assert_eq!(s.autosave_delay_ms, 500);
         assert!(!s.vim_mode);
+    }
+
+    /// Die eine Vorgabe, die keine Version stillschweigend umdrehen darf:
+    /// Wer eine Datei zum Nachschlagen öffnet, darf sie durch einen
+    /// versehentlichen Tastendruck nicht verändern.
+    #[test]
+    fn autosave_ist_standardmaessig_aus() {
+        assert!(!Settings::default().autosave);
+        // Auch ein gesetzter Notizen-Ordner schaltet ihn nicht ein — die
+        // Kopplung der beiden war genau der Fehler.
+        let mit_ordner = r#"{ "notesFolder": "/tmp/notizen" }"#;
+        let s: Settings = serde_json::from_str(mit_ordner).unwrap();
+        assert!(!s.autosave);
     }
 }

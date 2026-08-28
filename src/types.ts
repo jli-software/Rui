@@ -1,8 +1,6 @@
 export type LineEnding = "lf" | "crlf" | "cr";
 export type Theme = "sage-light" | "sage-dark" | "system";
 export type NoteExtension = "md" | "txt";
-/** Woraus der Dateiname einer selbst benannten Notiz entsteht. */
-export type NoteTitleSource = "first-line" | "date" | "date-first-line" | "first-line-date";
 export type NoteDateFormat = "ymd" | "ymd-hm" | "ymd-compact" | "ymd-compact-hm" | "dmy";
 export type DecorationMode = "auto" | "native" | "custom" | "none";
 /** Nach `auto`-Auflösung — nie `auto` selbst. */
@@ -88,11 +86,12 @@ export interface Settings {
   watchExternalChanges: boolean;
   confirmOnClose: boolean;
 
+  autosave: boolean;
+  autosaveDelayMs: number;
+
   notesFolder: string | null;
   noteExtension: NoteExtension;
-  noteTitleSource: NoteTitleSource;
   noteDateFormat: NoteDateFormat;
-  instantSaveDelayMs: number;
 
   searchFolders: string[];
   searchOpenFileFolder: boolean;
@@ -107,7 +106,6 @@ export interface Session {
   lineEnding: LineEnding | null;
   bom: boolean;
   createdAtMs: number | null;
-  autoNamed: boolean;
 }
 
 /**
@@ -127,16 +125,9 @@ export interface Buffer {
   /** Inhalt beim letzten Laden/Speichern, für den Modified-Vergleich. */
   savedContent: string;
   /**
-   * Wann dieser Puffer entstanden ist (Epoche in ms). Steht das Datum im
-   * Dateinamen, wird es hieraus gebildet und nicht aus der aktuellen Zeit —
-   * sonst wanderte eine Notiz beim Umbenennen kurz nach Mitternacht auf
-   * den nächsten Tag.
+   * Wann dieser Puffer entstanden ist (Epoche in ms). Ein namenloser
+   * Puffer wird hieraus benannt und nicht aus der aktuellen Zeit — sonst
+   * trüge eine um 23:58 begonnene Notiz das Datum des nächsten Tages.
    */
   createdAtMs: number;
-  /**
-   * Wurde dieser Puffer im Notizen-Ordner selbst benannt (statt von Hand
-   * geöffnet oder unter einem gewählten Namen gespeichert)? Nur solche
-   * Puffer werden umbenannt, wenn sich die erste Zeile ändert.
-   */
-  autoNamed: boolean;
 }
