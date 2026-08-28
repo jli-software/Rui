@@ -66,6 +66,8 @@ input (`2d`) in the status bar.
 
 `:w`, `:w <name>`, `:wq`, `:x`, `:saveas`, `:e`, `:e!`, `:q`, `:q!` and `:qa`
 go through Rui's own save and open, so encoding and line endings survive them.
+A write reports back in the status bar the way Vim reports in its command
+line — which is where a buffer that got its name on save tells you that name.
 `"+y` and `"+p` reach the system clipboard, as does `Ctrl+Shift+C` /
 `Ctrl+Shift+V`.
 
@@ -90,7 +92,10 @@ administrator or root rights.
 **Looks**
 
 Sage palette in light and dark, following the system by default. On Linux it
-picks up the active [Omarchy](https://omarchy.org) theme. Window decoration
+picks up the active [Omarchy](https://omarchy.org) theme — syntax colours as
+the theme means them, interface colours checked against the surface they land
+on, because a terminal palette says what a theme calls "green" and nothing
+about whether two of its colours stay readable side by side. Window decoration
 is automatic: own title bar on Windows, none under a tiling compositor.
 
 ## Keyboard

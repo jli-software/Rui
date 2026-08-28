@@ -66,6 +66,9 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
   einem festen Rot und tragen jetzt die Signalfarbe des Themes.
 
 ### Hinzugefügt
+- **Uhrzeiten im Schnellöffnen sind deutsch.** Neben „Heute" stand ein
+  `10:42 PM`, weil die Formatierung die Locale des Systems nahm. Die
+  Oberfläche ist deutsch, also ist es die Uhrzeit jetzt auch.
 - **Rückmeldung nach dem Speichern.** In der Statusleiste steht kurz
   `„notiz.md" geschrieben`, dann verschwindet sie wieder. Vim beantwortet
   ein `:w` mit einer Zeile über die geschriebene Datei; Rui hatte darauf
