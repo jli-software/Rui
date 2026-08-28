@@ -40,11 +40,15 @@ export interface VimHost {
 }
 
 /**
- * `Vim` ist ein Singleton des Moduls, seine Ex-Befehle sind es damit auch.
- * Rui hat genau ein Fenster und einen Host, also reicht es, sie einmal zu
- * definieren.
+ * `Vim` ist ein Singleton des Moduls, seine Ex-Befehle und Register sind es
+ * damit auch. Rui hat genau ein Fenster und einen Host, also reicht es, sie
+ * einmal zu definieren — und mehr als einmal geht auch gar nicht:
+ * `defineRegister` wirft beim zweiten Mal.
+ *
+ * Das ist kein theoretischer Fall. `vimExtension()` läuft bei **jedem**
+ * `setState`, also bei jedem Öffnen einer Datei.
  */
-let exCommandsDefined = false;
+let vimGlobalsDefined = false;
 
 /** Verhindert, dass derselbe Adapter zweimal einen Listener bekommt. */
 const watched = new WeakSet<CodeMirror>();
@@ -57,8 +61,11 @@ const watched = new WeakSet<CodeMirror>();
  * man tatsächlich einen `:`- oder `/`-Befehl eintippt.
  */
 export function vimExtension(host: VimHost): Extension {
-  defineExCommands(host);
-  defineClipboardRegisters();
+  if (!vimGlobalsDefined) {
+    vimGlobalsDefined = true;
+    defineExCommands(host);
+    defineClipboardRegisters();
+  }
   return [vim(), cursorTheme];
 }
 
@@ -76,45 +83,67 @@ export function vimExtension(host: VimHost): Extension {
  * wäre irreführender als beide gleich zu behandeln.
  */
 function defineClipboardRegisters() {
-  for (const name of ["+", "*"]) {
-    Vim.defineRegister(name, {
-      keyBuffer: [""],
-      insertModeChanges: [],
-      searchQueries: [],
-      linewise: false,
-      blockwise: false,
-      setText(text?: string, linewise?: boolean) {
-        this.linewise = !!linewise;
-        this.keyBuffer = [text ?? ""];
-        void write(text ?? "");
-      },
-      pushText(text: string, linewise?: boolean) {
-        this.linewise = !!linewise;
-        // Vim hängt beim Kopieren in ein Grossbuchstaben-Register an; für
-        // die Zwischenablage ist das der einzige Fall, in dem sich der
-        // bisherige Inhalt fortsetzt.
-        const combined = (this.keyBuffer[0] ?? "") + text;
-        this.keyBuffer = [combined];
-        void write(combined);
-      },
-      pushInsertModeChanges() {},
-      pushSearchQuery() {},
-      clear() {
-        this.keyBuffer = [""];
-        this.linewise = false;
-        void write("");
-      },
-      toString() {
-        // Der Zwischenspeicher aus `clipboard.ts`: Lesen ist asynchron,
-        // diese Methode ist es nicht. `watchMode` frischt ihn auf, sobald
-        // jemand `"` tippt — bis das Register drankommt, steht der aktuelle
-        // Inhalt bereit.
-        const text = cachedText();
-        this.keyBuffer = [text];
-        return text;
-      },
-    });
-  }
+  const register = clipboardRegister();
+
+  // `+` legt das Paket in seinem `RegisterController` selbst an, und
+  // `defineRegister` wirft bei einem Namen, den es schon gibt — genau daran
+  // ist Rui 0.3.0 beim Start gescheitert. Der richtige Griff ist deshalb,
+  // das vorhandene Register zu ersetzen statt ein neues anzumelden.
+  //
+  // `registers` steht in den Typen des Pakets nicht, der Controller wird
+  // ausdrücklich als Erweiterungspunkt herausgereicht. Der Cast benennt,
+  // was hier tatsächlich passiert.
+  const registers = (
+    Vim.getRegisterController() as unknown as { registers: Record<string, unknown> }
+  ).registers;
+  registers["+"] = register;
+
+  // `*` kennt das Paket dagegen nicht; ohne Anmeldung gilt `"*` als
+  // ungültiger Registername und die Eingabe läuft ins Leere.
+  if (!registers["*"]) Vim.defineRegister("*", register);
+}
+
+/**
+ * Ein Register, dessen Inhalt die System-Zwischenablage ist.
+ *
+ * `toString()` muss synchron antworten, das Lesen der Zwischenablage ist es
+ * nicht — deshalb der Zwischenspeicher aus `clipboard.ts`, den `watchMode`
+ * auffrischt, sobald jemand `"` tippt.
+ */
+function clipboardRegister() {
+  return {
+    keyBuffer: [""],
+    insertModeChanges: [],
+    searchQueries: [],
+    linewise: false,
+    blockwise: false,
+    setText(text?: string, linewise?: boolean) {
+      this.linewise = !!linewise;
+      this.keyBuffer = [text ?? ""];
+      void write(text ?? "");
+    },
+    pushText(text: string, linewise?: boolean) {
+      this.linewise = !!linewise;
+      // Vim hängt beim Kopieren in ein Grossbuchstaben-Register an; für die
+      // Zwischenablage ist das der einzige Fall, in dem sich der bisherige
+      // Inhalt fortsetzt.
+      const combined = (this.keyBuffer[0] ?? "") + text;
+      this.keyBuffer = [combined];
+      void write(combined);
+    },
+    pushInsertModeChanges() {},
+    pushSearchQuery() {},
+    clear() {
+      this.keyBuffer = [""];
+      this.linewise = false;
+      void write("");
+    },
+    toString() {
+      const text = cachedText();
+      this.keyBuffer = [text];
+      return text;
+    },
+  };
 }
 
 /**
@@ -192,9 +221,6 @@ function target(params: ExParams): string | undefined {
  * Puffer einen Namen zu geben — genau wie in NeoVim.
  */
 function defineExCommands(host: VimHost) {
-  if (exCommandsDefined) return;
-  exCommandsDefined = true;
-
   const writeThenQuit = async (params: ExParams) => {
     // Nur schliessen, wenn das Speichern wirklich geklappt hat — sonst
     // wäre der Text weg, weil der Nutzer den Dialog abgebrochen hat.

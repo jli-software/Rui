@@ -20,6 +20,24 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.3.1] — 2026-08-28
+
+### Behoben
+- **Rui startete mit aktiver Vim-Steuerung gar nicht mehr** und zeigte nur
+  noch „Rui konnte nicht starten — Register already defined +". Die
+  Zwischenablage aus 0.2.6 meldete `"+` mit `Vim.defineRegister` an; das
+  Register legt das Vim-Paket aber selbst schon in seinem
+  `RegisterController` an, und `defineRegister` wirft bei einem Namen, den
+  es bereits gibt. Rui ersetzt das vorhandene Register jetzt, statt ein
+  zweites anzumelden. `"*` kennt das Paket nicht und wird weiterhin
+  angemeldet — dort ist der Aufruf richtig.
+- **Ein Fehler in der Vim-Steuerung hindert Rui nicht mehr am Start.** Sie
+  ist eine Option, kein Fundament: Geht dort etwas schief, läuft der Editor
+  ohne sie weiter und sagt es über den fehlenden Modus in der Statusleiste,
+  statt mit einer leeren Seite dazustehen. Genau dieser Sicherheitsnetz
+  fehlte, weshalb aus einem Fehler in einer Zusatzfunktion ein
+  unbenutzbares Programm wurde.
+
 ## [0.3.0] — 2026-08-28
 
 Der Abschluss des Blocks, der mit 0.2.3 begann: Rui speichert nur noch auf
@@ -380,7 +398,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.0...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/vikingjunior12/Rui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/vikingjunior12/Rui/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/vikingjunior12/Rui/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/vikingjunior12/Rui/compare/v0.2.4...v0.2.5

@@ -305,7 +305,12 @@ export class RuiEditor {
    */
   async applyVimMode() {
     if (this.settings.vimMode && !this.vimModule) {
-      this.vimModule = await import("./vim");
+      try {
+        this.vimModule = await import("./vim");
+      } catch (err) {
+        console.error("Vim-Paket konnte nicht geladen werden:", err);
+        this.vimModule = null;
+      }
     }
     this.view.dispatch({ effects: this.c.vim.reconfigure(this.vimExt()) });
     this.syncVimStatus();
@@ -313,7 +318,19 @@ export class RuiEditor {
 
   private vimExt(): Extension {
     if (!this.settings.vimMode || !this.vimModule) return [];
-    return this.vimModule.vimExtension(this.vimHost);
+    try {
+      return this.vimModule.vimExtension(this.vimHost);
+    } catch (err) {
+      // Die Vim-Steuerung ist eine Option, kein Fundament. Diese Methode
+      // läuft in `buildState()`, also bei jedem Öffnen einer Datei und beim
+      // Start — eine Ausnahme daraus liess Rui bis 0.3.0 mit „konnte nicht
+      // starten" stehen, statt einfach ohne Vim weiterzulaufen. Der
+      // fehlende Modus in der Statusleiste ist das Signal, dass etwas
+      // schiefging; die Ursache steht in der Konsole.
+      console.error("Vim-Steuerung konnte nicht geladen werden:", err);
+      this.vimModule = null;
+      return [];
+    }
   }
 
   /** Hängt die Modusanzeige an den aktuellen Adapter — oder leert sie. */
