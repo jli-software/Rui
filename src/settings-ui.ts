@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { Command } from "./palette";
 import type { Settings } from "./types";
@@ -27,6 +28,13 @@ type FieldDef =
 interface Section {
   title: string;
   fields: FieldDef[];
+}
+
+/** Spiegelt `windows_integration::PathStatus`. */
+interface PathStatus {
+  registered: boolean;
+  folder: string;
+  otherFolder: string | null;
 }
 
 interface ShortcutDef {
@@ -365,7 +373,124 @@ export class SettingsDialog {
     // Tastatur gehört direkt hinter Eingabe: Die Kürzel sind keine
     // speicherbare Einstellung, sondern die Bedienungsanleitung dazu.
     sections.splice(2, 0, this.renderKeyboardSection());
+    const windows = this.renderWindowsSection();
+    if (windows) sections.push(windows);
     body.replaceChildren(...sections);
+  }
+
+  /**
+   * Der Abschnitt für Windows: `rui` im Terminal und der Weg zu den
+   * Standard-Apps.
+   *
+   * Er wird immer gebaut und füllt sich, sobald der Zustand vorliegt —
+   * schlägt die Abfrage fehl (jedes System ausser Windows), verschwindet er
+   * wieder. Eine Vorab-Abfrage der Plattform bräuchte ein weiteres Plugin
+   * für eine Frage, die diese eine Antwort schon beantwortet.
+   */
+  private renderWindowsSection(): HTMLElement | null {
+    if (!navigator.userAgent.includes("Windows")) return null;
+
+    const section = document.createElement("section");
+    section.className = "settings-section";
+    const heading = document.createElement("h3");
+    heading.textContent = "Windows";
+    section.append(heading);
+
+    section.append(this.renderTerminalRow());
+    section.append(
+      this.renderActionRow(
+        "Standard-Programm für Dateitypen",
+        "Rui meldet beim Installieren an, welche Endungen es öffnen kann — .txt, .md, .ps1, " +
+          ".sh, Quelltext und Logs. Welches Programm davon der Standard ist, legt seit " +
+          "Windows 10 nur der Benutzer selbst fest.",
+        "Windows-Einstellungen öffnen",
+        () => void invoke("open_default_apps"),
+      ),
+    );
+    return section;
+  }
+
+  /**
+   * Die Zeile für `rui` im Terminal.
+   *
+   * Sie füllt sich, sobald der Zustand vorliegt; schlägt die Abfrage fehl,
+   * verschwindet der ganze Abschnitt wieder. Damit braucht die Anzeige
+   * keine zweite Quelle für die Frage, ob Rui hier überhaupt etwas
+   * einrichten kann.
+   */
+  private renderTerminalRow(): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "settings-row";
+
+    const fill = (status: PathStatus) => {
+      const labels = document.createElement("div");
+      labels.className = "settings-labels";
+      const label = document.createElement("label");
+      label.textContent = "Im Terminal verfügbar";
+      const hint = document.createElement("small");
+
+      if (status.registered) {
+        hint.textContent =
+          `${status.folder} steht im Benutzer-PATH. "rui datei.ps1" öffnet die Datei hier — ` +
+          "ein bereits offenes Terminal kennt den Eintrag allerdings erst nach einem Neustart.";
+      } else if (status.otherFolder) {
+        // Zwei Kopien, eine davon im PATH: Wer hier klickt, holt den Befehl
+        // zu der Kopie, die er gerade vor sich hat.
+        hint.textContent =
+          `Im PATH steht eine andere Kopie von Rui (${status.otherFolder}). Eintragen holt ` +
+          `"rui" hierher: ${status.folder}`;
+      } else {
+        hint.textContent =
+          `Trägt ${status.folder} in den Benutzer-PATH ein, damit "rui datei.ps1" im Terminal ` +
+          "funktioniert. Kein Administrator nötig, jederzeit wieder wegnehmbar.";
+      }
+      labels.append(label, hint);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "link-btn";
+      button.textContent = status.registered ? "Entfernen" : "Eintragen";
+      button.addEventListener("click", () => {
+        button.disabled = true;
+        const command = status.registered ? "unregister_from_path" : "register_in_path";
+        invoke<PathStatus>(command).then(fill, (err) => {
+          button.disabled = false;
+          hint.textContent = String(err);
+        });
+      });
+
+      row.replaceChildren(labels, button);
+    };
+
+    void invoke<PathStatus>("path_status").then(fill, () => row.closest("section")?.remove());
+    return row;
+  }
+
+  private renderActionRow(
+    label: string,
+    hint: string,
+    action: string,
+    run: () => void,
+  ): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "settings-row";
+
+    const labels = document.createElement("div");
+    labels.className = "settings-labels";
+    const title = document.createElement("label");
+    title.textContent = label;
+    const small = document.createElement("small");
+    small.textContent = hint;
+    labels.append(title, small);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "link-btn";
+    button.textContent = action;
+    button.addEventListener("click", run);
+
+    row.append(labels, button);
+    return row;
   }
 
   private renderKeyboardSection(): HTMLElement {

@@ -1,6 +1,6 @@
 [package]
 name = "rui"
-version = "0.2.6"
+version = "0.3.0"
 description = "A lean text editor for snippets and notes"
 authors = ["Jonas Gaiching"]
 edition = "2021"
@@ -45,6 +45,10 @@ tempfile = "3"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+winreg = "0.56.0"
 
 [profile.release]
 codegen-units = 1

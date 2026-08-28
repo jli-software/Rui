@@ -145,6 +145,24 @@ log files — including rotated ones such as `deploy.log.3`. Build output stays
 out of the way: `node_modules`, `target`, `dist`, `build`, `bin`, `obj` and
 dot-folders like `.git` are skipped.
 
+## Windows integration
+
+**Settings → Windows** puts the folder of the running `rui.exe` on the user
+`PATH`, so `rui config.ps1` works from any terminal — and takes it back out
+again. No administrator rights, the system `PATH` is left alone. It lives in
+the app rather than the installer because the portable `rui.exe` has no
+installer and should be just as reachable; if two copies of Rui are around,
+the section says which one `rui` currently means. An already-open terminal
+inherits its environment at launch, so it needs a restart to see the change.
+
+The installer registers the file types Rui can display — text and logs,
+scripts (`.ps1`, `.psm1`, `.sh`, `.py`, …) and source (`.rs`, `.cs`, `.go`,
+`.json`, `.yaml`, `.toml`, `.sql`, `.xml`, …). Without that Rui does not even
+appear under "Open with". Which of them Rui is the *default* for is up to you:
+since Windows 10 no program may set that for itself, so the same section just
+opens the right settings page. `.html` and `.svg` are deliberately left out —
+those usually belong to the browser.
+
 ## Settings
 
 Defaults live in `settings.rs`, not in the JSON file. Settings are stored in
