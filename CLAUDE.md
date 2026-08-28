@@ -47,9 +47,9 @@ Ablauf, jedes Mal vollständig:
 5. **`git push --follow-tags`** — nicht liegen lassen. Das Repo ist
    öffentlich: <https://github.com/vikingjunior12/Rui>
 
-Ein **GitHub Release** mit Binaries gibt es nur bei Meilensteinen (0.2.0,
-0.3.0, …), nicht bei jeder Patch-Version — sonst steht die Release-Seite
-voll mit Zwischenständen.
+6. Für **jede Version** einen GitHub Release mit den gebauten Binaries
+   erstellen — ausdrücklich auch für Patch-Versionen. Jonas will jeden
+   getaggten Stand direkt von der Release-Seite testen können.
 
 ## Sprachen im Projekt
 

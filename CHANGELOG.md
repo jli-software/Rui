@@ -7,7 +7,6 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Geplant für 0.2
-- Shortcut-Übersicht in den Einstellungen
 - Tabs (Puffer-Modell in `types.ts` ist vorbereitet)
 
 ### Geplant, ohne Termin
@@ -16,6 +15,23 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.1.5] — 2026-08-28
+
+### Hinzugefügt
+- Neuer Abschnitt **„Tastatur"** in den Einstellungen: Ruis eigene Kürzel
+  stehen links und gelten auch bei aktiver Vim-Steuerung. Rechts stehen die
+  wichtigsten Vim-Griffe für Moduswechsel, Bewegung, Operatoren, Suche,
+  Speichern und Schliessen.
+- Die Rui-Liste entsteht aus denselben `shortcut`-Feldern wie die
+  Befehlspalette. Ein neues oder geändertes Kürzel kann damit nicht zwischen
+  Palette und Einstellungen auseinanderlaufen; nur die Befehlspalette selbst
+  steht zusätzlich fest in der Übersicht.
+
+### Projekt
+- Für jede Version wird ab jetzt ein GitHub Release mit Binaries erstellt,
+  ausdrücklich auch für Patch-Versionen. Ein getaggter Teststand soll direkt
+  von der Release-Seite installierbar sein.
 
 ## [0.1.4] — 2026-08-28
 
@@ -145,7 +161,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.4...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/vikingjunior12/Rui/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/vikingjunior12/Rui/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/vikingjunior12/Rui/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/vikingjunior12/Rui/compare/v0.1.1...v0.1.2

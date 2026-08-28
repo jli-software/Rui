@@ -1,4 +1,5 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import type { Command } from "./palette";
 import type { Settings } from "./types";
 
 type FieldDef =
@@ -26,6 +27,32 @@ interface Section {
   title: string;
   fields: FieldDef[];
 }
+
+interface ShortcutDef {
+  title: string;
+  shortcut: string;
+  group?: string;
+}
+
+/**
+ * Das Vim-Paket kennt weit mehr Befehle als in eine Übersicht passen. Hier
+ * stehen die Griffe, mit denen man sich bewegen und Rui sicher bedienen
+ * kann; Kombinationen wie `d` + Bewegung decken den Rest systematisch ab.
+ */
+const VIM_SHORTCUTS: ShortcutDef[] = [
+  { title: "Zum Normalmodus", shortcut: "Esc" },
+  { title: "Vor / nach dem Cursor einfügen", shortcut: "i / a" },
+  { title: "Zeile davor / danach einfügen", shortcut: "O / o" },
+  { title: "Zeichenweise / zeilenweise / blockweise auswählen", shortcut: "v / V / Strg+V" },
+  { title: "Links / unten / oben / rechts", shortcut: "h / j / k / l" },
+  { title: "Wortweise vor / zurück / ans Ende", shortcut: "w / b / e" },
+  { title: "Zeilenanfang / Zeilenende", shortcut: "0 / $" },
+  { title: "Dokumentanfang / Dokumentende", shortcut: "gg / G" },
+  { title: "Löschen / ändern / kopieren", shortcut: "d / c / y + Bewegung" },
+  { title: "Rückgängig / wiederholen", shortcut: "u / Strg+R" },
+  { title: "Suchen / weiter / zurück", shortcut: "/ / n / N" },
+  { title: "Speichern / schliessen / beides", shortcut: ":w / :q / :wq" },
+];
 
 /**
  * Die Einstellungen werden aus dieser Beschreibung erzeugt, nicht von Hand
@@ -232,6 +259,7 @@ export class SettingsDialog {
 
   constructor(
     private current: () => Settings,
+    private readonly commands: () => Command[],
     private readonly onChange: (s: Settings) => void,
     private readonly onOpenFile: () => void,
     private readonly onReset: () => void,
@@ -300,21 +328,87 @@ export class SettingsDialog {
 
   private render() {
     const body = this.root.querySelector(".settings-body")!;
-    body.replaceChildren(
-      ...SECTIONS.map((section) => {
-        const el = document.createElement("section");
-        el.className = "settings-section";
+    const sections = SECTIONS.map((section) => {
+      const el = document.createElement("section");
+      el.className = "settings-section";
 
-        const h = document.createElement("h3");
-        h.textContent = section.title;
-        el.append(h);
+      const h = document.createElement("h3");
+      h.textContent = section.title;
+      el.append(h);
 
-        for (const field of section.fields) {
-          el.append(this.renderField(field));
-        }
-        return el;
-      }),
+      for (const field of section.fields) {
+        el.append(this.renderField(field));
+      }
+      return el;
+    });
+    // Tastatur gehört direkt hinter Eingabe: Die Kürzel sind keine
+    // speicherbare Einstellung, sondern die Bedienungsanleitung dazu.
+    sections.splice(2, 0, this.renderKeyboardSection());
+    body.replaceChildren(...sections);
+  }
+
+  private renderKeyboardSection(): HTMLElement {
+    const section = document.createElement("section");
+    section.className = "settings-section settings-keyboard";
+
+    const heading = document.createElement("h3");
+    heading.textContent = "Tastatur";
+    section.append(heading);
+
+    const groups = document.createElement("div");
+    groups.className = "settings-shortcut-groups";
+
+    const ruiShortcuts: ShortcutDef[] = [
+      { title: "Befehlspalette", shortcut: "Strg+Umschalt+P", group: "Rui" },
+      ...this.commands()
+        .filter((command) => command.shortcut)
+        .map((command) => ({
+          title: command.title.replace(/…$/, ""),
+          shortcut: command.shortcut!,
+          group: command.group,
+        })),
+    ];
+    groups.append(
+      this.renderShortcutGroup("Rui", "Gelten immer, auch bei aktiver Vim-Steuerung.", ruiShortcuts),
+      this.renderShortcutGroup(
+        "Vim",
+        "Gelten im Editor, wenn die Vim-Steuerung unter Eingabe aktiv ist.",
+        VIM_SHORTCUTS,
+      ),
     );
+    section.append(groups);
+    return section;
+  }
+
+  private renderShortcutGroup(title: string, hint: string, shortcuts: ShortcutDef[]): HTMLElement {
+    const group = document.createElement("div");
+    group.className = "settings-shortcut-group";
+
+    const heading = document.createElement("h4");
+    heading.textContent = title;
+    const description = document.createElement("small");
+    description.className = "settings-shortcut-hint";
+    description.textContent = hint;
+    group.append(heading, description);
+
+    for (const shortcut of shortcuts) {
+      const row = document.createElement("div");
+      row.className = "settings-shortcut-row";
+
+      const label = document.createElement("span");
+      label.textContent = shortcut.title;
+      if (shortcut.group && shortcut.group !== "Rui") {
+        const category = document.createElement("small");
+        category.textContent = shortcut.group;
+        label.prepend(category);
+      }
+
+      const keys = document.createElement("kbd");
+      keys.textContent = shortcut.shortcut;
+      row.append(label, keys);
+      group.append(row);
+    }
+    return group;
   }
 
   private renderField(field: FieldDef): HTMLElement {

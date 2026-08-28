@@ -424,6 +424,69 @@ kbd {
   text-transform: uppercase;
 }
 
+.settings-shortcut-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.settings-shortcut-group {
+  min-width: 0;
+}
+
+.settings-shortcut-group h4 {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-shortcut-hint {
+  display: block;
+  min-height: 31px;
+  margin: 2px 0 7px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.settings-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 27px;
+  padding: 3px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.settings-shortcut-row > span {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.settings-shortcut-row > span small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.settings-shortcut-row kbd {
+  flex-shrink: 0;
+  max-width: 52%;
+  text-align: center;
+  white-space: normal;
+}
+
+@media (max-width: 620px) {
+  .settings-shortcut-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-shortcut-hint {
+    min-height: 0;
+  }
+}
+
 .settings-row {
   display: flex;
   align-items: center;

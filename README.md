@@ -45,6 +45,8 @@ checksum published with each release if you want to be sure of what you got.
   left of the status bar. `:w`, `:wq`, `:x` and `:q` go through Rui's own
   save and close, so encoding and line endings survive them. The whole thing
   is a lazy chunk: leave it off and it never loads.
+- **Shortcut reference** inside the settings, split into Rui's always-active
+  shortcuts and the essential Vim motions and commands.
 - **Sage colour palette**, light and dark, plus automatic
   [Omarchy](https://omarchy.org) theme detection on Linux
 
@@ -61,7 +63,8 @@ checksum published with each release if you want to be sure of what you got.
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | Font size |
 
 With Vim keybindings enabled, everything Vim binds works inside the text
-area; Rui's own `Ctrl` shortcuts keep working alongside it.
+area; Rui's own `Ctrl` shortcuts keep working alongside it. The same list,
+plus a compact Vim reference, is available under **Settings → Keyboard**.
 
 Everything else lives in the command palette.
 
@@ -170,7 +173,6 @@ file size at around 25 MB — beyond that, Rui asks first.
 
 ## Roadmap
 
-- A shortcut reference inside the settings
 - Tabs (the buffer model in `types.ts` is prepared for it)
 - Theming beyond the two built-in palettes
 - UI localisation (English first)

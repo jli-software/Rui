@@ -72,6 +72,7 @@ class App {
     this.palette = new CommandPalette(() => this.commands());
     this.settingsDialog = new SettingsDialog(
       () => this.settings,
+      () => this.commands(),
       (s) => void this.updateSettings(s),
       () => void this.openSettingsFile(),
       () => void this.resetSettings(),
