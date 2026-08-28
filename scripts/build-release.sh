@@ -14,6 +14,10 @@ npm run build
 echo "==> Linux-Binary bauen (release)"
 (cd src-tauri && cargo build --release)
 
+# release/ enthält immer genau einen Stand: den zuletzt gebauten. Sonst
+# sammeln sich dort Binaries aus einem halben Dutzend Versionen an, und
+# welche davon die aktuelle ist, sieht man dem Ordner nicht mehr an.
+rm -rf release
 mkdir -p release
 cp src-tauri/target/release/rui release/rui-linux
 chmod +x release/rui-linux

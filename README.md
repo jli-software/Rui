@@ -19,8 +19,8 @@ Grab the latest build from the [Releases page](https://github.com/vikingjunior12
 | File | What it is |
 |---|---|
 | `rui.exe` | Portable Windows binary, runs without installing |
-| `Rui_<version>_x64-setup.exe` | NSIS installer (per-user install) |
-| `Rui_<version>_x64_en-US.msi` | MSI, for deployment via Intune/GPO |
+| `rui-setup.exe` | NSIS installer (per-user install) |
+| `rui-setup.msi` | MSI, for deployment via Intune/GPO |
 | `rui-linux` | Portable Linux binary |
 
 The builds are **not code-signed** yet, so Windows SmartScreen will show a
@@ -172,7 +172,9 @@ tools, the Rust target `x86_64-pc-windows-msvc`, and Node.
 ```
 
 The script builds the frontend and the release binary and drops everything
-into `release/`. On Linux, `scripts/build-release.sh` does the same and
+into `release/` under fixed names — `rui.exe`, `rui-setup.exe`,
+`rui-setup.msi` — clearing the folder first, so it always holds exactly the
+build you just made. On Linux, `scripts/build-release.sh` does the same and
 produces `release/rui-linux`.
 
 ### Icons

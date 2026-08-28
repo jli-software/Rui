@@ -12,10 +12,23 @@ npm run tauri build
 if ($LASTEXITCODE -ne 0) { throw 'tauri build fehlgeschlagen' }
 
 $out = 'src-tauri\target\release'
+
+# release/ enthält immer genau einen Stand: den zuletzt gebauten. Sonst
+# sammeln sich dort Installer aus einem halben Dutzend Versionen an, und
+# welcher davon der aktuelle ist, sieht man dem Ordner nicht mehr an.
+Remove-Item 'release' -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path 'release' | Out-Null
+
+# Feste Namen ohne Versionsnummer: die Version steht im Tag und in den
+# Dateieigenschaften der EXE. Ein Link auf rui-setup.exe bleibt damit über
+# Releases hinweg gültig, und der Ordner sagt auf einen Blick, was er ist.
 Copy-Item "$out\rui.exe" 'release\rui.exe' -Force
-Copy-Item "$out\bundle\nsis\*-setup.exe" 'release\' -Force
-Copy-Item "$out\bundle\msi\*.msi" 'release\' -Force
+$nsis = Get-ChildItem "$out\bundle\nsis\*-setup.exe" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime | Select-Object -Last 1
+if ($nsis) { Copy-Item $nsis.FullName 'release\rui-setup.exe' -Force }
+$msi = Get-ChildItem "$out\bundle\msi\*.msi" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime | Select-Object -Last 1
+if ($msi) { Copy-Item $msi.FullName 'release\rui-setup.msi' -Force }
 
 Write-Host '==> Fertig:'
 Get-ChildItem 'release' | ForEach-Object { Write-Host ('    {0}  ({1:N1} MB)' -f $_.Name, ($_.Length / 1MB)) }
