@@ -31,6 +31,13 @@ interface Section {
 }
 
 /** Spiegelt `windows_integration::PathStatus`. */
+/** Spiegelt `integration::DesktopStatus`. */
+interface DesktopStatus {
+  registered: boolean;
+  path: string;
+}
+
+/** Spiegelt `integration::PathStatus`. */
 interface PathStatus {
   registered: boolean;
   folder: string;
@@ -373,8 +380,8 @@ export class SettingsDialog {
     // Tastatur gehört direkt hinter Eingabe: Die Kürzel sind keine
     // speicherbare Einstellung, sondern die Bedienungsanleitung dazu.
     sections.splice(2, 0, this.renderKeyboardSection());
-    const windows = this.renderWindowsSection();
-    if (windows) sections.push(windows);
+    const system = this.renderSystemSection();
+    if (system) sections.push(system);
     body.replaceChildren(...sections);
   }
 
@@ -387,26 +394,46 @@ export class SettingsDialog {
    * wieder. Eine Vorab-Abfrage der Plattform bräuchte ein weiteres Plugin
    * für eine Frage, die diese eine Antwort schon beantwortet.
    */
-  private renderWindowsSection(): HTMLElement | null {
-    if (!navigator.userAgent.includes("Windows")) return null;
+  /**
+   * Rui im System einhängen — je nach Plattform zwei verschiedene Fragen
+   * mit derselben Absicht.
+   *
+   * Unter Windows: Ordner in den Benutzer-`PATH`, Dateitypen meldet der
+   * Installer an. Unter Linux: Symlink in `~/.local/bin`, Dateitypen über
+   * eine `.desktop`-Datei, die Rui selbst schreibt.
+   *
+   * Die Erkennung läuft über den User-Agent des Webviews. Ein eigenes
+   * Plugin nur für die Frage „welches System" wäre Aufwand für etwas, das
+   * hier ohnehin bereitsteht.
+   */
+  private renderSystemSection(): HTMLElement | null {
+    const agent = navigator.userAgent;
+    const windows = agent.includes("Windows");
+    const linux = agent.includes("Linux") && !agent.includes("Android");
+    if (!windows && !linux) return null;
 
     const section = document.createElement("section");
     section.className = "settings-section";
     const heading = document.createElement("h3");
-    heading.textContent = "Windows";
+    heading.textContent = windows ? "Windows" : "Linux";
     section.append(heading);
 
-    section.append(this.renderTerminalRow());
-    section.append(
-      this.renderActionRow(
-        "Standard-Programm für Dateitypen",
-        "Rui meldet beim Installieren an, welche Endungen es öffnen kann — .txt, .md, .ps1, " +
-          ".sh, Quelltext und Logs. Welches Programm davon der Standard ist, legt seit " +
-          "Windows 10 nur der Benutzer selbst fest.",
-        "Windows-Einstellungen öffnen",
-        () => void invoke("open_default_apps"),
-      ),
-    );
+    section.append(this.renderTerminalRow(windows));
+
+    if (windows) {
+      section.append(
+        this.renderActionRow(
+          "Standard-Programm für Dateitypen",
+          "Rui meldet beim Installieren an, welche Endungen es öffnen kann — .txt, .md, .ps1, " +
+            ".sh, Quelltext und Logs. Welches Programm davon der Standard ist, legt seit " +
+            "Windows 10 nur der Benutzer selbst fest.",
+          "Windows-Einstellungen öffnen",
+          () => void invoke("open_default_apps"),
+        ),
+      );
+    } else {
+      section.append(this.renderDesktopRow());
+    }
     return section;
   }
 
@@ -418,7 +445,7 @@ export class SettingsDialog {
    * keine zweite Quelle für die Frage, ob Rui hier überhaupt etwas
    * einrichten kann.
    */
-  private renderTerminalRow(): HTMLElement {
+  private renderTerminalRow(windows: boolean): HTMLElement {
     const row = document.createElement("div");
     row.className = "settings-row";
 
@@ -429,20 +456,24 @@ export class SettingsDialog {
       label.textContent = "Im Terminal verfügbar";
       const hint = document.createElement("small");
 
+      const beispiel = windows ? "rui datei.ps1" : "rui datei.sh";
+      const wo = windows ? "den Benutzer-PATH" : "~/.local/bin";
+
       if (status.registered) {
         hint.textContent =
-          `${status.folder} steht im Benutzer-PATH. "rui datei.ps1" öffnet die Datei hier — ` +
-          "ein bereits offenes Terminal kennt den Eintrag allerdings erst nach einem Neustart.";
+          `${status.folder} — "${beispiel}" öffnet die Datei hier. Ein bereits offenes ` +
+          "Terminal kennt den Eintrag allerdings erst nach einem Neustart.";
       } else if (status.otherFolder) {
-        // Zwei Kopien, eine davon im PATH: Wer hier klickt, holt den Befehl
-        // zu der Kopie, die er gerade vor sich hat.
+        // Zwei Kopien, eine davon eingetragen: Wer hier klickt, holt den
+        // Befehl zu der Kopie, die er gerade vor sich hat.
         hint.textContent =
-          `Im PATH steht eine andere Kopie von Rui (${status.otherFolder}). Eintragen holt ` +
-          `"rui" hierher: ${status.folder}`;
+          `Eingetragen ist eine andere Kopie von Rui (${status.otherFolder}). ` +
+          `Eintragen holt "rui" hierher.`;
       } else {
         hint.textContent =
-          `Trägt ${status.folder} in den Benutzer-PATH ein, damit "rui datei.ps1" im Terminal ` +
-          "funktioniert. Kein Administrator nötig, jederzeit wieder wegnehmbar.";
+          `Legt Rui in ${wo}, damit "${beispiel}" im Terminal funktioniert. ` +
+          (windows ? "Kein Administrator nötig" : "Kein root nötig") +
+          ", jederzeit wieder wegnehmbar.";
       }
       labels.append(label, hint);
 
@@ -463,6 +494,51 @@ export class SettingsDialog {
     };
 
     void invoke<PathStatus>("path_status").then(fill, () => row.closest("section")?.remove());
+    return row;
+  }
+
+  /**
+   * Die `.desktop`-Datei — nur unter Linux.
+   *
+   * Sie meldet Rui als Programm für Text-, Script- und Quelltext-Typen an,
+   * macht es aber ausdrücklich nicht zum Standard: Das bleibt eine
+   * Entscheidung im Dateimanager. Dieselbe Linie wie unter Windows, wo das
+   * seit Windows 10 ohnehin nur der Benutzer darf.
+   */
+  private renderDesktopRow(): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "settings-row";
+
+    const fill = (status: DesktopStatus) => {
+      const labels = document.createElement("div");
+      labels.className = "settings-labels";
+      const label = document.createElement("label");
+      label.textContent = "Als Programm für Dateitypen anmelden";
+      const hint = document.createElement("small");
+      hint.textContent = status.registered
+        ? `${status.path} ist angelegt — Rui steht im Dateimanager unter „Öffnen mit“. ` +
+          "Zum Standardprogramm machst du es dort selbst."
+        : "Schreibt eine .desktop-Datei für Text, Logs, Scripts und Quelltext, damit Rui " +
+          "unter „Öffnen mit“ auftaucht. Zum Standard wird es dadurch nicht.";
+      labels.append(label, hint);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "link-btn";
+      button.textContent = status.registered ? "Entfernen" : "Anmelden";
+      button.addEventListener("click", () => {
+        button.disabled = true;
+        const command = status.registered ? "unregister_desktop" : "register_desktop";
+        invoke<DesktopStatus>(command).then(fill, (err) => {
+          button.disabled = false;
+          hint.textContent = String(err);
+        });
+      });
+
+      row.replaceChildren(labels, button);
+    };
+
+    void invoke<DesktopStatus>("desktop_status").then(fill, () => row.remove());
     return row;
   }
 

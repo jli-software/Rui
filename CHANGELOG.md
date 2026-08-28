@@ -9,7 +9,6 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ### Geplant für 0.3.x
 - Kürzel in den Einstellungen nicht nur zeigen, sondern umstellen können
 - Vim: `:set number`, `:set wrap` und Verwandtschaft auf Ruis Einstellungen
-- Linux: `rui <datei>` und Dateiverknüpfungen über die Paketierung
 
 ### Geplant für 0.4
 - Tabs (Puffer-Modell in `types.ts` ist vorbereitet)
@@ -20,6 +19,34 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.3.3] — 2026-08-28
+
+### Hinzugefügt
+- **Rui hängt sich jetzt auch unter Linux ein.** Der Abschnitt in den
+  Einstellungen heisst dort **Linux** und macht dasselbe wie sein
+  Windows-Pendant, nur auf dem Weg, den das System vorsieht:
+  - **`rui datei.sh` im Terminal** über einen Symlink in `~/.local/bin` —
+    dem von der XDG-Spezifikation vorgesehenen Ort, der auf Arch, Fedora und
+    Debian bereits im `PATH` steht. Symlink statt Kopie, damit er nach einem
+    Neubau weiter auf den aktuellen Stand zeigt. Steht der Ordner
+    ausnahmsweise **nicht** im `PATH`, sagt die Anzeige das dazu — ein Link,
+    den die Shell nicht findet, nützt niemandem.
+  - **`.desktop`-Eintrag** unter `~/.local/share/applications`, damit Rui im
+    Dateimanager unter „Öffnen mit" auftaucht. Zum Standardprogramm macht
+    sich Rui ausdrücklich nicht; das bleibt eine Entscheidung im
+    Dateimanager oder mit `xdg-mime default`.
+- Angemeldet werden dieselben Typen wie unter Windows — Text, Logs, Scripts,
+  Quelltext. `text/html` und `image/svg+xml` bleiben aussen vor: die gehören
+  dem Browser.
+
+### Geändert
+- `windows_integration.rs` heisst jetzt `integration.rs` und enthält beide
+  Systeme nebeneinander. Der alte Name behauptete etwas, das nicht mehr
+  stimmt, und die Nicht-Windows-Seite war darin nur eine Reihe von
+  Fehlermeldungen.
+- Nichts davon wird systemweit geschrieben. Alles liegt unter dem
+  Benutzerprofil, ohne Administrator- oder Root-Rechte.
 
 ## [0.3.2] — 2026-08-28
 
@@ -412,7 +439,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.2...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/vikingjunior12/Rui/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/vikingjunior12/Rui/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/vikingjunior12/Rui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/vikingjunior12/Rui/compare/v0.2.6...v0.3.0

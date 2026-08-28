@@ -1,9 +1,9 @@
 mod decoration;
 mod document;
+mod integration;
 mod omarchy;
 mod quick_open;
 mod settings;
-mod windows_integration;
 
 #[cfg(desktop)]
 use tauri::{Emitter, Manager};
@@ -138,10 +138,13 @@ pub fn run() {
             decoration::resolve_decoration,
             omarchy::omarchy_available,
             omarchy::load_omarchy_theme,
-            windows_integration::path_status,
-            windows_integration::register_in_path,
-            windows_integration::unregister_from_path,
-            windows_integration::open_default_apps,
+            integration::path_status,
+            integration::register_in_path,
+            integration::unregister_from_path,
+            integration::desktop_status,
+            integration::register_desktop,
+            integration::unregister_desktop,
+            integration::open_default_apps,
         ])
         .run(tauri::generate_context!())
         .expect("Rui konnte nicht gestartet werden");

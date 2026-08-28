@@ -73,13 +73,19 @@ The settings carry a reference of both Rui's own shortcuts and the essential
 Vim motions — which makes this a reasonable place to learn the keys without
 leaving Windows.
 
-**Windows integration**
+**System integration**
 
-- `rui file.ps1` from any terminal: one button in the settings puts the
-  folder of the running `rui.exe` on the user `PATH`, and takes it back out.
-  No administrator rights
-- Registers text, log, script and source file types so Rui shows up under
-  *Open with*; a button leads to the page where you pick the default
+One section in the settings hooks Rui into the system and unhooks it again.
+Nothing is written system-wide — it all lives under your user profile, no
+administrator or root rights.
+
+- **Windows** — puts the folder of the running `rui.exe` on the user `PATH`
+  so `rui file.ps1` works from any terminal. The installer registers text,
+  log, script and source file types so Rui shows up under *Open with*; a
+  button leads to the page where you pick the default
+- **Linux** — symlinks the binary into `~/.local/bin` for the same thing,
+  and writes a `.desktop` entry so Rui appears in the file manager's *Open
+  with*. Neither makes Rui the default; that stays your call
 
 **Looks**
 
