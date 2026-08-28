@@ -1,7 +1,7 @@
 {
   "name": "rui",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A lean text editor for snippets and notes",
   "license": "MIT",
   "author": "Jonas Gaiching",

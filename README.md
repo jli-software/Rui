@@ -113,6 +113,18 @@ The script builds the frontend and the release binary and drops everything
 into `release/`. On Linux, `scripts/build-release.sh` does the same and
 produces `release/rui-linux`.
 
+### Icons
+
+The icon is drawn as three SVGs in `assets/logo/`, one per size class: the
+leaf's side veins merge into a single stripe below 48 px, and at 16 px the
+central rib splits the leaf in half. `scripts/build-icons.ps1` renders each
+class from the fitting drawing and reassembles `src-tauri/icons/`
+(ImageMagick 7 required).
+
+Note that `build.rs` declares `cargo:rerun-if-changed=icons` — without it a
+changed icon does not re-run the build script, and the executable silently
+keeps the previously compiled Windows resource.
+
 ## Architecture
 
 The text buffer lives in the frontend (CodeMirror 6), Rust does file I/O,

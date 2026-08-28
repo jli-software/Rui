@@ -13,6 +13,26 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.1.1] — 2026-08-28
+
+### Geändert
+- Icon in drei Grössenklassen aufgeteilt: die Seitenadern des Blatts laufen
+  unter 48 px zu einem Streifen zusammen, bei 16 px teilt die Mittelrippe das
+  Blatt optisch in zwei Hälften. Jede Klasse bekommt jetzt die Fassung, die
+  auf ihr noch lesbar ist (`rui.svg`, `rui-small.svg`, `rui-tiny.svg`).
+- Neues Script `scripts/build-icons.ps1` setzt `src-tauri/icons/` aus den
+  SVG-Quellen neu zusammen (braucht ImageMagick 7).
+
+### Behoben
+- `build.rs` meldet cargo jetzt `rerun-if-changed=icons`. Vorher kannte
+  tauri-build nur `tauri.conf.json` und die Capabilities als Abhängigkeit —
+  eine geänderte Icon-Datei liess das Build-Script nicht neu laufen, und die
+  EXE trug unter Windows stillschweigend weiter das alte Icon.
+
+### Projekt
+- Veröffentlichung unter MIT auf GitHub, englisches README, `CLAUDE.md` mit
+  den Arbeitsregeln (Versionierung bei jeder Änderung, Changelog, Push).
+
 ## [0.1.0] — 2026-08-28
 
 Erste Veröffentlichung.
@@ -41,5 +61,6 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.0...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.1
 [0.1.0]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.0
