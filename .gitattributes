@@ -1,0 +1,14 @@
+# Textdateien im Repo mit LF, im Working Tree plattformüblich
+* text=auto eol=lf
+
+# PowerShell braucht CRLF, sonst zickt der Parser auf manchen Hosts
+*.ps1 text eol=crlf
+
+# Encoding-Testdaten: Git darf hier NICHTS normalisieren, sonst testen
+# die Fixtures nicht mehr das, wofür sie da sind (BOM, Windows-1252, CRLF)
+testdaten/** -text
+
+# Binärformate
+*.png binary
+*.ico binary
+*.icns binary

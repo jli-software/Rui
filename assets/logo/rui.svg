@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Rui — Salbeiblatt. Mittelrippe steht wie ein Schreibcursor,
+       die Seitenadern liegen da wie kurze Textzeilen.
+       Farben aus src/theme.ts (sageDark). -->
+  <defs>
+    <linearGradient id="ruiBg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#333f34"/>
+      <stop offset="1" stop-color="#1a201b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#ruiBg)"/>
+  <path d="M 256 104 C 348 182, 380 268, 256 408 C 132 268, 164 182, 256 104 Z" fill="#94b489"/>
+  <path d="M 256 132 L 256 392" stroke="#1e2620" stroke-width="20" stroke-linecap="round"/>
+  <g stroke="#1e2620" stroke-width="15" stroke-linecap="round" opacity="0.85">
+    <path d="M 256 208 L 316 178"/>
+    <path d="M 256 208 L 196 178"/>
+    <path d="M 256 278 L 326 244"/>
+    <path d="M 256 278 L 186 244"/>
+  </g>
+</svg>

@@ -1,0 +1,514 @@
+/*
+ * Alle Farben kommen als CSS-Custom-Properties von `theme.ts` und werden
+ * beim Themenwechsel auf <html> neu gesetzt. Hier steht deshalb keine
+ * einzige feste Farbe — sonst müsste jeder Palettenwechsel an zwei
+ * Stellen nachgezogen werden.
+ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --ui-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --radius: 6px;
+  --status-height: 26px;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui-font);
+  font-size: 13px;
+  /* Nur der Editor selbst soll Text markierbar machen. */
+  user-select: none;
+}
+
+#editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  user-select: text;
+}
+
+/* ---- Eigene Titelleiste (nur im `custom`-Dekorationsmodus, siehe titlebar.ts) ---- */
+
+#titlebar {
+  display: none;
+  flex-shrink: 0;
+  align-items: stretch;
+  height: 34px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+body[data-decoration="custom"] #titlebar {
+  display: flex;
+}
+
+.titlebar-drag {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-left: 10px;
+}
+
+.titlebar-text {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titlebar-controls {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.tb-btn {
+  width: 44px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tb-btn:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.tb-close:hover {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.cm-editor {
+  height: 100%;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+/* ---- Statusleiste ---- */
+
+#status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--status-height);
+  padding: 0 8px 0 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.status-left,
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.status-left {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-flags.is-modified {
+  color: var(--accent);
+}
+
+.status-selection {
+  padding: 0 6px;
+}
+
+.status-btn {
+  padding: 3px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.status-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---- Overlays: Palette, Prompt, Einstellungen ---- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.palette {
+  align-self: flex-start;
+  width: min(620px, calc(100vw - 48px));
+  margin-top: 12vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--text) 22%, transparent);
+  overflow: hidden;
+}
+
+.palette-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.palette-input:focus {
+  outline: none;
+}
+
+.palette-input::placeholder {
+  color: var(--muted);
+}
+
+.palette--prompt .palette-input {
+  border-bottom: none;
+}
+
+.prompt-label {
+  display: block;
+  padding: 10px 14px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.palette-list {
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.palette-item.is-active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.palette-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-group {
+  margin-right: 8px;
+  color: var(--muted);
+}
+
+.palette-item.is-active .palette-group {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.palette-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.palette-item.is-active .palette-meta {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.palette-state {
+  font-variant: small-caps;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  font-family: var(--ui-font);
+  font-size: 11px;
+}
+
+.palette-item.is-active kbd {
+  border-color: color-mix(in srgb, var(--accent-text) 40%, transparent);
+  background: transparent;
+}
+
+/* ---- Einstellungen ---- */
+
+.settings {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 48px));
+  max-height: min(80vh, 720px);
+  margin-top: 8vh;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--text) 22%, transparent);
+  overflow: hidden;
+}
+
+.settings-head,
+.settings-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  flex-shrink: 0;
+}
+
+.settings-head {
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-foot {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.settings-body {
+  padding: 4px 16px 12px;
+  overflow-y: auto;
+}
+
+.settings-section {
+  padding: 12px 0;
+}
+
+.settings-section + .settings-section {
+  border-top: 1px solid var(--border);
+}
+
+.settings-section h3 {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+}
+
+.settings-labels {
+  min-width: 0;
+}
+
+.settings-labels label {
+  display: block;
+  cursor: pointer;
+}
+
+.settings-labels small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.settings-row input[type="text"],
+.settings-row input[type="number"],
+.settings-row select {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.settings-row input[type="text"] {
+  width: 220px;
+}
+
+.settings-row input[type="number"] {
+  width: 76px;
+}
+
+.settings-row select {
+  width: 160px;
+}
+
+.settings-row :is(input, select):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.settings-folder {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-folder input[type="text"] {
+  width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+.settings-folder .link-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Schalter statt Standard-Checkbox — dieselbe Fläche, klarerer Zustand. */
+.switch {
+  flex-shrink: 0;
+  appearance: none;
+  position: relative;
+  width: 34px;
+  height: 19px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.switch:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.switch:checked::after {
+  background: var(--accent-text);
+  transform: translateX(15px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.icon-btn,
+.link-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.icon-btn {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.icon-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.link-btn {
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link-btn:hover {
+  color: var(--accent);
+}
+
+/* Schlanke Scrollleisten, passend zur Palette. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background: var(--border);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: content-box;
+}

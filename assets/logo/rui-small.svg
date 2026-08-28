@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Fassung für 32 px und kleiner: ohne Seitenadern, kräftigere Rippe.
+       Die Adern laufen bei dieser Grösse sonst ineinander. -->
+  <defs>
+    <linearGradient id="ruiBgS" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#333f34"/>
+      <stop offset="1" stop-color="#1a201b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#ruiBgS)"/>
+  <path d="M 256 96 C 352 178, 386 268, 256 416 C 126 268, 160 178, 256 96 Z" fill="#94b489"/>
+  <path d="M 256 132 L 256 396" stroke="#1e2620" stroke-width="30" stroke-linecap="round"/>
+</svg>

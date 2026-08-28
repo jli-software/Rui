@@ -1,0 +1,4 @@
+Grüezi Jonas
+Äpfel, Öl und Übermut
+Straße mit ß
+Das hier ist Windows-1252 mit CRLF.
