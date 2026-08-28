@@ -6,12 +6,29 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
-### Geplant
+### Geplant für 0.2
+- Notiz-Titel und Autosave steuerbar (Titelquelle, Datumsformat, Verzögerung)
+- NeoVim-Steuerung, abschaltbar — Normal-/Insert-/Visual-Modus
+- Shortcut-Übersicht in den Einstellungen
 - Tabs (Puffer-Modell in `types.ts` ist vorbereitet)
+
+### Geplant, ohne Termin
+- Theming, also frei wählbare Farben
 - Lokalisierung der Oberfläche (zuerst Englisch)
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.1.2] — 2026-08-28
+
+### Hinzugefügt
+- Zahnrad unten rechts in der Statusleiste, öffnet die Einstellungen. Bis
+  jetzt kam man nur über `Strg+,` oder die Befehlspalette dorthin — beides
+  muss man kennen. Rui bleibt tastaturgetrieben, aber die eine Stelle, an
+  der man das umstellt, soll man auch sehen können.
+- Die Statusleiste hat rechts hinter einem Trenner eine Werkzeuggruppe
+  bekommen. Dort landet, was etwas *tut*, statt etwas über die Datei
+  auszusagen — heute das Zahnrad, später etwa die Schriftgrösse.
 
 ## [0.1.1] — 2026-08-28
 
@@ -61,6 +78,7 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.1...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/vikingjunior12/Rui/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.1
 [0.1.0]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.0

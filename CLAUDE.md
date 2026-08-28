@@ -42,8 +42,14 @@ Ablauf, jedes Mal vollständig:
 2. `CHANGELOG.md` ergänzen — unter `## [Unveröffentlicht]`, oder als neuer
    Versionsblock, wenn die Änderung damit abgeschlossen ist
 3. Committen (Commit-Message auf Deutsch, erklärt das *Warum*, nicht das Was)
-4. **`git push`** — nicht liegen lassen. Das Repo ist öffentlich:
-   <https://github.com/vikingjunior12/Rui>
+4. Tag `v<version>` setzen — jede Version bekommt einen, damit die
+   Vergleichslinks im Changelog auflösen
+5. **`git push --follow-tags`** — nicht liegen lassen. Das Repo ist
+   öffentlich: <https://github.com/vikingjunior12/Rui>
+
+Ein **GitHub Release** mit Binaries gibt es nur bei Meilensteinen (0.2.0,
+0.3.0, …), nicht bei jeder Patch-Version — sonst steht die Release-Seite
+voll mit Zwischenständen.
 
 ## Sprachen im Projekt
 

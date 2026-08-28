@@ -69,6 +69,7 @@ class App {
       onLanguage: () => this.pickLanguage(),
       onEncoding: () => this.pickEncoding(),
       onLineEnding: () => this.pickLineEnding(),
+      onSettings: () => this.settingsDialog.open(),
     });
     this.titlebar = new TitleBar(document.querySelector<HTMLElement>("#titlebar")!);
 

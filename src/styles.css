@@ -159,6 +159,44 @@ body[data-decoration="custom"] #titlebar {
   color: var(--text);
 }
 
+/* Trennt die Werkzeuge von den Feldern, die nur etwas anzeigen. */
+.status-divider {
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+.status-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.status-icon:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Ohne block bleibt unter dem Inline-SVG die Grundlinie als Lücke stehen. */
+.status-icon svg {
+  display: block;
+}
+
 /* ---- Overlays: Palette, Prompt, Einstellungen ---- */
 
 .overlay {

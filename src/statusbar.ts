@@ -13,9 +13,27 @@ export interface StatusActions {
   onLineEnding: () => void;
   onLanguage: () => void;
   onPosition: () => void;
+  onSettings: () => void;
 }
 
 const LINE_ENDING_LABEL = { lf: "LF", crlf: "CRLF", cr: "CR" } as const;
+
+/**
+ * Zahnrad, selbst gezeichnet statt aus einer Icon-Bibliothek: ein Ring mit
+ * acht radialen Zähnen und einer Nabe. Bei 14 px zerfällt ein detaillierter
+ * Zahnkranz zu Matsch — diese Form bleibt lesbar, weil die Zähne einzelne
+ * Striche sind und mit der Strichstärke mitwachsen. `currentColor` sorgt
+ * dafür, dass es dem Hover-Zustand des Knopfes folgt.
+ */
+const GEAR_SVG = `
+  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"
+       stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+    <circle cx="8" cy="8" r="4.4" />
+    <circle cx="8" cy="8" r="1.6" />
+    <path d="M8 3.6V1.5M8 12.4v2.1M3.6 8H1.5M12.4 8h2.1
+             M4.89 4.89 3.4 3.4M11.11 11.11l1.49 1.49
+             M11.11 4.89 12.6 3.4M4.89 11.11 3.4 12.6" />
+  </svg>`;
 
 /**
  * Die einzige dauerhaft sichtbare Bedienfläche neben dem Text.
@@ -23,6 +41,12 @@ const LINE_ENDING_LABEL = { lf: "LF", crlf: "CRLF", cr: "CR" } as const;
  * Jedes Feld ist anklickbar und öffnet die zugehörige Auswahl — dadurch
  * braucht der Editor keine Menüleiste für Encoding, Zeilenende oder
  * Sprache, und die Information steht trotzdem immer im Blick.
+ *
+ * Ganz rechts sitzt hinter einem Trenner die Werkzeuggruppe. Sie ist von
+ * den Textfeldern getrennt, weil dort Knöpfe landen, die nichts über die
+ * Datei aussagen, sondern etwas tun — heute das Zahnrad, später etwa die
+ * Schriftgrösse. Alles, was mit der Maus erreichbar sein muss, gehört
+ * hierher und nicht in eine Menüleiste.
  */
 export class StatusBar {
   private readonly position: HTMLButtonElement;
@@ -31,6 +55,7 @@ export class StatusBar {
   private readonly encoding: HTMLButtonElement;
   private readonly lineEnding: HTMLButtonElement;
   private readonly flags: HTMLSpanElement;
+  private readonly settings: HTMLButtonElement;
 
   constructor(root: HTMLElement, actions: StatusActions) {
     root.innerHTML = `
@@ -43,6 +68,12 @@ export class StatusBar {
         <button class="status-btn status-language" title="Sprache wählen"></button>
         <button class="status-btn status-encoding" title="Encoding wählen"></button>
         <button class="status-btn status-eol" title="Zeilenende wählen"></button>
+        <span class="status-divider"></span>
+        <div class="status-tools">
+          <button class="status-icon status-settings" title="Einstellungen (Strg+,)" aria-label="Einstellungen">
+            ${GEAR_SVG}
+          </button>
+        </div>
       </div>`;
 
     this.position = root.querySelector(".status-position")!;
@@ -51,11 +82,13 @@ export class StatusBar {
     this.encoding = root.querySelector(".status-encoding")!;
     this.lineEnding = root.querySelector(".status-eol")!;
     this.flags = root.querySelector(".status-flags")!;
+    this.settings = root.querySelector(".status-settings")!;
 
     this.position.addEventListener("click", actions.onPosition);
     this.language.addEventListener("click", actions.onLanguage);
     this.encoding.addEventListener("click", actions.onEncoding);
     this.lineEnding.addEventListener("click", actions.onLineEnding);
+    this.settings.addEventListener("click", actions.onSettings);
   }
 
   update(info: StatusInfo, buffer: Buffer, languageName: string, modified: boolean) {
