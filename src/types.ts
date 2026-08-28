@@ -53,6 +53,8 @@ export interface QuickOpenFile {
   path: string;
   name: string;
   relativePath: string;
+  /** Der durchsuchte Ordner, aus dem die Datei stammt. */
+  root: string;
   modifiedMs: number;
 }
 
@@ -91,6 +93,9 @@ export interface Settings {
   noteTitleSource: NoteTitleSource;
   noteDateFormat: NoteDateFormat;
   instantSaveDelayMs: number;
+
+  searchFolders: string[];
+  searchOpenFileFolder: boolean;
 }
 
 export interface Session {

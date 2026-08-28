@@ -14,8 +14,8 @@ const RENDER_LIMIT = 500;
 export interface QuickOpenActions {
   /** `null`: Es ist noch kein Notizen-Ordner eingerichtet. */
   load: () => Promise<QuickOpenFile[] | null>;
-  /** Der durchsuchte Ordner, für den Kopf des Fensters. */
-  scope: () => string | null;
+  /** Die durchsuchten Ordner, für den Kopf des Fensters. */
+  scope: () => string[];
   open: (path: string) => void;
   openNative: () => void;
   openSettings: () => void;
@@ -126,11 +126,18 @@ export class QuickOpen {
    * Zeigt an, worin gesucht wird.
    *
    * Ohne das bleibt beim Tippen offen, warum eine Datei fehlt, die es doch
-   * gibt — sie liegt schlicht ausserhalb des eingestellten Ordners.
+   * gibt — sie liegt schlicht ausserhalb der eingestellten Ordner. Ab zwei
+   * Ordnern steht nur noch ihre Zahl da; die Pfade selbst stehen im Tooltip,
+   * sonst wächst der Kopf über das Fenster hinaus.
    */
-  private setScope(folder: string | null) {
-    this.scope.textContent = folder ? shortenPath(folder) : "";
-    this.scope.title = folder ?? "";
+  private setScope(folders: string[]) {
+    this.scope.textContent =
+      folders.length === 0
+        ? ""
+        : folders.length === 1
+          ? shortenPath(folders[0])
+          : `${folders.length} Ordner`;
+    this.scope.title = folders.join("\n");
   }
 
   private filter() {
@@ -173,7 +180,8 @@ export class QuickOpen {
       const name = document.createElement("strong");
       name.textContent = file.name;
       const path = document.createElement("small");
-      path.textContent = relativeFolder(file.relativePath);
+      path.textContent = itemFolder(file);
+      path.title = file.path;
       text.append(name, path);
 
       const modified = document.createElement("time");
@@ -319,9 +327,18 @@ function shortenPath(folder: string): string {
   return parts.slice(-2).join("/");
 }
 
-function relativeFolder(relativePath: string): string {
-  const separator = Math.max(relativePath.lastIndexOf("/"), relativePath.lastIndexOf("\\"));
-  return separator < 0 ? "Notizen-Ordner" : relativePath.slice(0, separator);
+/**
+ * Wo die Datei liegt, als `Wurzelordner/Unterordner`.
+ *
+ * Der Name des durchsuchten Ordners steht immer davor: Bei mehreren Ordnern
+ * sagte der relative Pfad allein nicht, in welchem man landet, und bei einem
+ * einzigen ist er trotzdem die bessere Auskunft als ein fester Text.
+ */
+function itemFolder(file: QuickOpenFile): string {
+  const relative = file.relativePath.replace(/\\/g, "/");
+  const separator = relative.lastIndexOf("/");
+  const root = shortenPath(file.root).split("/").pop() ?? "";
+  return separator < 0 ? root : `${root}/${relative.slice(0, separator)}`;
 }
 
 function formatModified(modifiedMs: number): string {

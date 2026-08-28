@@ -3,7 +3,7 @@
 //! Der native Dateidialog bleibt für beliebige Pfade zuständig. Diese Liste
 //! bildet dagegen den schnellen Wechsel zwischen Dateien ab, die man beim
 //! Arbeiten wirklich nacheinander aufmacht: Notizen, Scripts, Quelltext und
-//! Logdateien aus dem eingestellten Ordner, zuletzt geänderte zuerst.
+//! Logdateien aus den eingestellten Ordnern, zuletzt geänderte zuerst.
 //!
 //! Welche Endungen dazugehören, entscheidet die Oberfläche und gibt sie mit —
 //! dieselbe Liste, aus der auch Syntax-Highlighting und die Dateidialoge
@@ -59,26 +59,57 @@ pub struct QuickOpenFile {
     path: String,
     name: String,
     relative_path: String,
+    /// Der durchsuchte Ordner, aus dem diese Datei stammt. Bei mehreren
+    /// Ordnern sagt der relative Pfad allein sonst nicht, wo man landet.
+    root: String,
     modified_ms: u64,
 }
 
+/// Durchsucht mehrere Ordner auf einmal.
+///
+/// Ein einzelner unlesbarer oder verschwundener Ordner darf die Liste nicht
+/// leeren — ein Netzlaufwerk ist mal weg, der Rest bleibt brauchbar. Ein
+/// Fehler kommt nur zurück, wenn sich kein einziger Ordner lesen liess.
 #[tauri::command]
 pub fn list_note_files(
-    folder: String,
+    folders: Vec<String>,
     extensions: Vec<String>,
 ) -> Result<Vec<QuickOpenFile>, String> {
-    let root = absolute_path(PathBuf::from(folder))?;
-    if !root.is_dir() {
-        return Err(format!("Ordner nicht gefunden: {}", root.display()));
-    }
-
     let wanted: HashSet<String> = extensions
         .into_iter()
         .map(|e| e.trim_start_matches('.').to_ascii_lowercase())
         .collect();
 
     let mut files = Vec::new();
-    collect_files(&root, &root, &wanted, 0, &mut files)?;
+    // Ordner dürfen ineinander liegen — der Notizen-Ordner und der Ordner der
+    // offenen Datei etwa. Ohne diese Menge stünde jede Datei doppelt drin.
+    let mut seen = HashSet::new();
+    let mut errors = Vec::new();
+    let mut scanned = 0;
+
+    for folder in folders {
+        let root = match absolute_path(PathBuf::from(folder)) {
+            Ok(root) if root.is_dir() => root,
+            Ok(root) => {
+                errors.push(format!("Ordner nicht gefunden: {}", root.display()));
+                continue;
+            }
+            Err(error) => {
+                errors.push(error);
+                continue;
+            }
+        };
+        scanned += 1;
+        let _ = collect_files(&root, &root, &wanted, 0, &mut seen, &mut files);
+    }
+
+    if scanned == 0 {
+        return Err(errors
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| "Kein Ordner zum Durchsuchen eingestellt.".to_string()));
+    }
+
     sort_files(&mut files);
     Ok(files)
 }
@@ -107,6 +138,7 @@ fn collect_files(
     dir: &Path,
     wanted: &HashSet<String>,
     depth: usize,
+    seen: &mut HashSet<String>,
     files: &mut Vec<QuickOpenFile>,
 ) -> Result<(), String> {
     let entries = fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -128,10 +160,15 @@ fn collect_files(
                 continue;
             }
             // Ein unlesbarer Unterordner soll nicht die ganze Liste blockieren.
-            let _ = collect_files(root, &path, wanted, depth + 1, files);
+            let _ = collect_files(root, &path, wanted, depth + 1, seen, files);
             continue;
         }
         if !file_type.is_file() || !is_text_file(&name, wanted) {
+            continue;
+        }
+        // Windows vergleicht Pfade ohne Rücksicht auf Gross- und
+        // Kleinschreibung; für die Dublettenprüfung reicht das überall.
+        if !seen.insert(path.to_string_lossy().to_lowercase()) {
             continue;
         }
 
@@ -148,6 +185,7 @@ fn collect_files(
             path: path.to_string_lossy().into_owned(),
             name,
             relative_path: relative.to_string_lossy().into_owned(),
+            root: root.to_string_lossy().into_owned(),
             modified_ms,
         });
     }
@@ -207,7 +245,7 @@ mod tests {
         fs::write(root.join("Deploy.ps1"), "Write-Host").unwrap();
         fs::write(root.join("bild.png"), "kein Text").unwrap();
 
-        let files = list_note_files(root.to_string_lossy().into_owned(), extensions()).unwrap();
+        let files = list_note_files(vec![root.to_string_lossy().into_owned()], extensions()).unwrap();
         let mut relative: Vec<_> = files.iter().map(|f| f.relative_path.as_str()).collect();
         relative.sort_unstable();
 
@@ -231,7 +269,7 @@ mod tests {
         fs::write(root.join(".git").join("COMMIT_EDITMSG.txt"), "").unwrap();
         fs::write(root.join("Notiz.md"), "").unwrap();
 
-        let files = list_note_files(root.to_string_lossy().into_owned(), extensions()).unwrap();
+        let files = list_note_files(vec![root.to_string_lossy().into_owned()], extensions()).unwrap();
 
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].name, "Notiz.md");
@@ -251,18 +289,45 @@ mod tests {
     }
 
     #[test]
+    fn mehrere_ordner_ohne_dubletten_und_ohne_stolpern() {
+        let root = temp_root("mehrere");
+        let unten = root.join("Unten");
+        fs::create_dir_all(&unten).unwrap();
+        fs::write(root.join("Oben.md"), "").unwrap();
+        fs::write(unten.join("Unten.md"), "").unwrap();
+
+        // Der zweite Ordner liegt im ersten, der dritte gibt es gar nicht.
+        let files = list_note_files(
+            vec![
+                root.to_string_lossy().into_owned(),
+                unten.to_string_lossy().into_owned(),
+                root.join("Weg").to_string_lossy().into_owned(),
+            ],
+            extensions(),
+        )
+        .unwrap();
+
+        assert_eq!(files.len(), 2, "Unten.md darf nur einmal drinstehen");
+        assert!(files.iter().all(|f| Path::new(&f.root).is_dir()));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn neueste_datei_steht_zuerst() {
         let mut files = vec![
             QuickOpenFile {
                 path: "alt.md".to_string(),
                 name: "alt.md".to_string(),
                 relative_path: "alt.md".to_string(),
+                root: ".".to_string(),
                 modified_ms: 100,
             },
             QuickOpenFile {
                 path: "neu.md".to_string(),
                 name: "neu.md".to_string(),
                 relative_path: "neu.md".to_string(),
+                root: ".".to_string(),
                 modified_ms: 200,
             },
         ];
@@ -275,7 +340,7 @@ mod tests {
     #[test]
     fn fehlender_ordner_liefert_einen_verstaendlichen_fehler() {
         let err =
-            list_note_files("definitiv-nicht-vorhanden-rui".to_string(), extensions()).unwrap_err();
+            list_note_files(vec!["definitiv-nicht-vorhanden-rui".to_string()], extensions()).unwrap_err();
         assert!(err.contains("Ordner nicht gefunden"));
     }
 }

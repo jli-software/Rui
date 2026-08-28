@@ -21,7 +21,8 @@ type FieldDef =
       options: [string, string][];
     }
   | { key: keyof Settings; type: "text"; label: string; hint?: string }
-  | { key: keyof Settings; type: "folder"; label: string; hint?: string };
+  | { key: keyof Settings; type: "folder"; label: string; hint?: string }
+  | { key: keyof Settings; type: "folders"; label: string; hint?: string };
 
 interface Section {
   title: string;
@@ -225,6 +226,23 @@ const SECTIONS: Section[] = [
         min: 100,
         max: 5000,
         step: 100,
+      },
+    ],
+  },
+  {
+    title: "Quick Open",
+    fields: [
+      {
+        key: "searchFolders",
+        type: "folders",
+        label: "Zusätzliche Ordner",
+        hint: "Strg+O durchsucht neben dem Notizen-Ordner auch diese — für Scripts und Logs, die woanders liegen. Baukram wie node_modules, target und .git bleibt überall aussen vor.",
+      },
+      {
+        key: "searchOpenFileFolder",
+        type: "bool",
+        label: "Ordner der offenen Datei mitdurchsuchen",
+        hint: "Wer eine Logdatei von Hand geöffnet hat, will als Nächstes meist eine daneben",
       },
     ],
   },
@@ -516,6 +534,65 @@ export class SettingsDialog {
         });
 
         wrap.append(display, pick, clear);
+        control = wrap;
+        break;
+      }
+      case "folders": {
+        const wrap = document.createElement("div");
+        wrap.className = "settings-folders";
+
+        const paths = [...((value as string[] | null) ?? [])];
+        const list = document.createElement("ul");
+        list.className = "settings-folder-list";
+
+        const draw = () => {
+          list.replaceChildren(
+            ...paths.map((path, index) => {
+              const item = document.createElement("li");
+              const text = document.createElement("span");
+              text.textContent = path;
+              text.title = path;
+
+              const remove = document.createElement("button");
+              remove.type = "button";
+              remove.className = "link-btn";
+              remove.textContent = "Entfernen";
+              remove.addEventListener("click", () => {
+                paths.splice(index, 1);
+                draw();
+                this.commit(field.key, [...paths]);
+              });
+
+              item.append(text, remove);
+              return item;
+            }),
+          );
+          if (paths.length === 0) {
+            const empty = document.createElement("li");
+            empty.className = "settings-folder-empty";
+            empty.textContent = "Keine zusätzlichen Ordner";
+            list.append(empty);
+          }
+        };
+        draw();
+
+        const add = document.createElement("button");
+        add.type = "button";
+        add.className = "link-btn";
+        add.id = `set-${field.key}`;
+        add.textContent = "Ordner hinzufügen…";
+        add.addEventListener("click", async () => {
+          const dir = await openDialog({ directory: true });
+          // Derselbe Ordner zweimal brächte jede Datei darin doppelt.
+          if (typeof dir !== "string" || paths.some((p) => p.toLowerCase() === dir.toLowerCase())) {
+            return;
+          }
+          paths.push(dir);
+          draw();
+          this.commit(field.key, [...paths]);
+        });
+
+        wrap.append(list, add);
         control = wrap;
         break;
       }

@@ -679,6 +679,41 @@ kbd {
   white-space: nowrap;
 }
 
+/* Liste zusätzlicher Suchordner: beliebig viele, jeder einzeln entfernbar. */
+.settings-folders {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  width: 280px;
+}
+
+.settings-folder-list {
+  width: 100%;
+  list-style: none;
+}
+
+.settings-folder-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.settings-folder-list li span {
+  overflow: hidden;
+  direction: rtl;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-folder-empty {
+  color: var(--muted);
+}
+
 /* Schalter statt Standard-Checkbox — dieselbe Fläche, klarerer Zustand. */
 .switch {
   flex-shrink: 0;

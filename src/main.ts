@@ -88,15 +88,15 @@ class App {
     );
     this.quickOpen = new QuickOpen({
       load: () => {
-        const folder = this.settings.notesFolder;
-        return folder
+        const folders = this.searchFolders();
+        return folders.length > 0
           ? invoke<QuickOpenFile[]>("list_note_files", {
-              folder,
+              folders,
               extensions: textFileExtensions(),
             })
           : Promise.resolve(null);
       },
-      scope: () => this.settings.notesFolder,
+      scope: () => this.searchFolders(),
       open: (path) => void this.openPath(path),
       openNative: () => void this.openFileDialog(),
       openSettings: () => this.settingsDialog.open(),
@@ -125,6 +125,29 @@ class App {
     this.refreshStatus();
     await getCurrentWindow().show();
     this.editor.view.focus();
+  }
+
+  /**
+   * Welche Ordner `Strg+O` durchsucht, in dieser Reihenfolge: der
+   * Notizen-Ordner, die zusätzlich eingestellten, und zuletzt der Ordner der
+   * offenen Datei.
+   *
+   * Der letzte steht bewusst nicht in den Einstellungen: Wer eine Logdatei
+   * von Hand geöffnet hat, will als Nächstes fast immer eine daneben, und
+   * dieser Ordner ist bereits bekannt.
+   */
+  private searchFolders(): string[] {
+    const folders: string[] = [];
+    const add = (folder: string | null) => {
+      if (!folder) return;
+      const known = folders.some((f) => f.toLowerCase() === folder.toLowerCase());
+      if (!known) folders.push(folder);
+    };
+
+    add(this.settings.notesFolder);
+    for (const folder of this.settings.searchFolders) add(folder);
+    if (this.settings.searchOpenFileFolder) add(parentFolder(this.buffer.path));
+    return folders;
   }
 
   // ---- Puffer -----------------------------------------------------------
@@ -904,6 +927,13 @@ class App {
 
     window.addEventListener("beforeunload", () => void this.saveSession());
   }
+}
+
+/** Der Ordner, in dem eine Datei liegt — `null` für einen leeren Puffer. */
+function parentFolder(path: string | null): string | null {
+  if (!path) return null;
+  const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+  return separator > 0 ? path.slice(0, separator) : null;
 }
 
 // Wenn der Start scheitert, darf das Fenster nicht unsichtbar bleiben —

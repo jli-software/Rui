@@ -143,6 +143,17 @@ pub struct Settings {
     /// Kurz genug, dass es sich anfühlt, als wäre immer schon gespeichert;
     /// lang genug, dass nicht jeder Buchstabe die Platte anfasst.
     pub instant_save_delay_ms: u32,
+
+    // --- Quick Open ---
+    /// Weitere Ordner, die `Strg+O` neben dem Notizen-Ordner durchsucht.
+    /// Für Scripts und Logs, die nicht bei den Notizen liegen.
+    pub search_folders: Vec<String>,
+    /// Den Ordner der gerade offenen Datei mitdurchsuchen.
+    ///
+    /// Standardmässig an: Wer eine Logdatei von Hand geöffnet hat, will als
+    /// Nächstes fast immer eine daneben — und der Ordner ist bekannt, ohne
+    /// dass ihn jemand einstellen müsste.
+    pub search_open_file_folder: bool,
 }
 
 impl Default for Settings {
@@ -181,6 +192,9 @@ impl Default for Settings {
             note_title_source: NoteTitleSource::FirstLine,
             note_date_format: NoteDateFormat::YmdHm,
             instant_save_delay_ms: 500,
+
+            search_folders: Vec::new(),
+            search_open_file_folder: true,
         }
     }
 }

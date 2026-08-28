@@ -81,9 +81,15 @@ its own from then on — half a second after the last keystroke by default, no
 
 `Ctrl+O` opens Rui's own file picker for this folder. It searches recursively,
 starts with the most recently changed files, and is fully usable with typing,
-arrow keys, `Enter` and `Escape`. The folder being searched is named in its
-header. **Open another file…** in its footer, or `Ctrl+Shift+O`, keeps the
-native system dialog available for files elsewhere.
+arrow keys, `PageUp`/`PageDown`, `Home`/`End`, `Enter` and `Escape`. The folders
+being searched are named in its header. **Open another file…** in its footer,
+or `Ctrl+Shift+O`, keeps the native system dialog available for files
+elsewhere.
+
+Scripts and logs rarely live with your notes, so the settings take **any
+number of extra search folders**, and the folder of the file you currently
+have open is searched too — open one log by hand and its siblings are a
+`Ctrl+O` away. Every entry names the folder it came from.
 
 Everything Rui can highlight, it can also find: `.txt`, `.md`, `.ps1`, `.sh`,
 `.rs`, `.cs`, `.py`, `.go`, `.json`, `.yaml` and the rest of the list, plus

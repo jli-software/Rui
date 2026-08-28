@@ -7,8 +7,6 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Geplant für 0.3 — Slices in dieser Reihenfolge
-- Zusätzliche Suchordner in den Einstellungen, Ordner der offenen Datei als
-  eigene Gruppe
 - Standard-Editor unter Windows: Endungen erweitern, Registrier-Knopf
 - Vim: Tastenkonflikte auflösen, `:e`, `:set` auf Ruis Einstellungen
 - Einstellungen zusätzlich auf `Strg+Umschalt+I`
@@ -22,6 +20,29 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.2.2] — 2026-08-28
+
+### Hinzugefügt
+- **Quick Open durchsucht mehrere Ordner.** Neuer Abschnitt „Quick Open" in
+  den Einstellungen: beliebig viele **zusätzliche Ordner**, jeder einzeln
+  wieder entfernbar. Scripts und Logs liegen selten dort, wo die Notizen
+  liegen — bisher blieb dafür nur der native Dialog.
+- **Der Ordner der offenen Datei wird mitdurchsucht** (abschaltbar, an).
+  Eine von Hand geöffnete Logdatei macht damit ihre Nachbarn auf einen
+  Tastendruck erreichbar, ohne dass jemand den Ordner erst einstellen muss.
+- Jeder Eintrag nennt den Ordner, aus dem er stammt; der volle Pfad steht im
+  Tooltip. Bei mehreren Wurzeln sagte der relative Pfad allein nicht, wo man
+  landet.
+
+### Geändert
+- Der Kopf des Fensters zeigt ab zwei Ordnern deren Zahl statt eines Pfades;
+  die Pfade selbst stehen im Tooltip.
+- Ein einzelner unlesbarer Ordner leert die Liste nicht mehr — ein
+  Netzlaufwerk ist mal weg, der Rest bleibt brauchbar. Ein Fehler kommt nur
+  zurück, wenn sich kein einziger Ordner lesen liess.
+- Liegen zwei Suchordner ineinander, steht jede Datei trotzdem nur einmal in
+  der Liste.
 
 ## [0.2.1] — 2026-08-28
 
@@ -234,7 +255,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.2.1...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/vikingjunior12/Rui/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/vikingjunior12/Rui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/vikingjunior12/Rui/compare/v0.1.6...v0.2.0
 [0.1.6]: https://github.com/vikingjunior12/Rui/compare/v0.1.5...v0.1.6
