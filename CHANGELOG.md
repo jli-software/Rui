@@ -20,6 +20,37 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.3.5] — 2026-08-28
+
+### Hinzugefügt
+- **`scripts/install-linux.sh`** — installiert Rui für den angemeldeten
+  Benutzer, ohne Root und ohne etwas ausserhalb des Benutzerprofils
+  anzufassen:
+  - Binary nach `~/.local/share/rui/rui`, Symlink `~/.local/bin/rui`
+    darauf — damit `rui datei.txt` im Terminal funktioniert. Die Binary zieht
+    um und bleibt kein Link ins Repo: `build-release.sh` leert `release/` bei
+    jedem Lauf, ein Link dorthin wäre nach dem nächsten Build tot.
+  - Icons in `~/.local/share/icons/hicolor/<grösse>/apps/rui.png`. Ohne die
+    zeigte der Anwendungsstarter bisher nur ein Platzhaltersymbol — die
+    `.desktop`-Datei verweist mit `Icon=rui` auf ein Icon, das niemand
+    installiert hat.
+  - `rui.desktop` wortgleich zu dem, was Rui aus den Einstellungen heraus
+    schreibt, damit beide Wege denselben Zustand sehen.
+  - `--uninstall` nimmt alles wieder weg, `--build` erzwingt einen Neubau.
+  - Steht `~/.local/bin` nicht im `PATH`, sagt das Script, wie man das für
+    bash, zsh und fish nachholt.
+
+### Behoben
+- **`StartupWMClass` traf die Fensterklasse nicht.** Im `.desktop`-Eintrag
+  stand fest `Rui`, gemeldet wird aber der Name der Binary (`rui`, bei der
+  Release-Datei `rui-linux`). Dadurch ordnete kein Dock und keine
+  Fensterliste ein laufendes Rui-Fenster seinem Starter-Eintrag zu. Der Wert
+  kommt jetzt aus dem Dateinamen der Binary.
+- **`Categories` hatte zwei Hauptkategorien** (`Utility` und `Development`).
+  Menüs, die danach einsortieren, führen den Eintrag dann doppelt;
+  `desktop-file-validate` warnt davor. Jetzt `Utility;TextEditor;` — eine
+  Hauptkategorie, eine Zusatzkategorie, wie die Spezifikation es vorsieht.
+
 ## [0.3.4] — 2026-08-28
 
 ### Behoben
@@ -452,7 +483,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.4...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/vikingjunior12/Rui/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/vikingjunior12/Rui/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/vikingjunior12/Rui/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/vikingjunior12/Rui/compare/v0.3.1...v0.3.2

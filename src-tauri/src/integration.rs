@@ -418,8 +418,21 @@ mod imp {
         "text/x-ini",
     ];
 
+    /// `Categories` hat genau **eine** Hauptkategorie: `Utility`.
+    /// `TextEditor` ist laut Spezifikation eine Zusatzkategorie, `Development`
+    /// wäre eine zweite Hauptkategorie — und Menüs, die nach Hauptkategorien
+    /// einsortieren, führen den Eintrag dann doppelt.
     fn desktop_entry(exec: &str) -> String {
         let mime = MIME_TYPES.join(";");
+        // `StartupWMClass` muss die Fensterklasse treffen, die der
+        // Compositor tatsächlich sieht — und das ist unter GTK der Name der
+        // Binary, nicht der Anzeigename. Eine Binary namens `rui-linux`
+        // meldet sich als `rui-linux`; stünde hier fest `Rui`, ordnete kein
+        // Dock und keine Fensterliste das laufende Fenster diesem Eintrag zu.
+        let wm_class = Path::new(exec)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "rui".to_string());
         format!(
             "[Desktop Entry]\n\
              Type=Application\n\
@@ -428,10 +441,10 @@ mod imp {
              Exec={exec} %f\n\
              Icon=rui\n\
              Terminal=false\n\
-             Categories=Utility;TextEditor;Development;\n\
+             Categories=Utility;TextEditor;\n\
              MimeType={mime};\n\
              StartupNotify=true\n\
-             StartupWMClass=Rui\n"
+             StartupWMClass={wm_class}\n"
         )
     }
 
@@ -506,6 +519,9 @@ mod imp {
             // Der Browser behält, was ihm gehört.
             assert!(!text.contains("text/html"));
             assert!(!text.contains("image/svg"));
+            // Die Fensterklasse ist der Binary-Name, nicht der Anzeigename.
+            assert!(text.contains("StartupWMClass=rui\n"));
+            assert!(desktop_entry("/opt/rui/rui-linux").contains("StartupWMClass=rui-linux\n"));
             // Ein `.desktop` ohne abschliessenden Umbruch lesen manche
             // Parser nicht zu Ende.
             assert!(text.ends_with('\n'));

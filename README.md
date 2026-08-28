@@ -126,6 +126,31 @@ cd src-tauri && cargo test     # tests
 ./scripts/build-release.sh     # Linux:   release/rui-linux
 ```
 
+Build through the Tauri CLI, not `cargo build --release`. The Cargo feature
+`custom-protocol` — which only the CLI sets — decides whether the app serves
+its frontend from the embedded `dist/` or from the dev server on
+`localhost:1420`. A binary built without it starts on an error page.
+
+### Install on Linux
+
+```bash
+./scripts/install-linux.sh              # build if needed, then install
+./scripts/install-linux.sh --uninstall  # remove it again
+```
+
+Puts the binary in `~/.local/share/rui`, a symlink in `~/.local/bin` so
+`rui file.txt` works in a terminal, icons in `~/.local/share/icons`, and a
+`rui.desktop` entry so Rui shows up in the application launcher and under
+*Open with*. No root, nothing outside your home directory. It does not make
+itself the default editor — that stays your call:
+
+```bash
+xdg-mime default rui.desktop text/plain
+```
+
+The same registration is available from Rui's settings under *Linux*, for
+when you run the binary from wherever you downloaded it.
+
 Windows is built natively, not cross-compiled — WebView2 and the MSVC linker
 make that unreliable from the outside. Needs the MSVC build tools, the
 `x86_64-pc-windows-msvc` target and Node.
