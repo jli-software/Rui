@@ -117,6 +117,10 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        // Die System-Zwischenablage. `navigator.clipboard` reicht dafür nicht:
+        // Lesen verlangt im Webview eine Berechtigung, die Rui nicht bekommt,
+        // und ohne Lesen gäbe es kein `"+p`.
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             startup_files,
             document::open_file,

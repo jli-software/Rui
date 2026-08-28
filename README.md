@@ -53,8 +53,8 @@ checksum published with each release if you want to be sure of what you got.
   normal, insert, visual and replace mode, with the current one shown on the
   left of the status bar. `:w`, `:w <name>`, `:wq`, `:x`, `:saveas`, `:e` and
   `:q` go through Rui's own save, open and close, so encoding and line endings
-  survive them. The whole thing is a lazy chunk: leave it off and it never
-  loads.
+  survive them, and the `"+` / `"*` registers reach the system clipboard. The
+  whole thing is a lazy chunk: leave it off and it never loads.
 - **Shortcut reference** inside the settings, split into Rui's always-active
   shortcuts and the essential Vim motions and commands.
 - **Sage colour palette**, light and dark, plus automatic
@@ -70,8 +70,9 @@ checksum published with each release if you want to be sure of what you got.
 | `Ctrl+Shift+O` | Open another file with the system dialog |
 | `Ctrl+Shift+S` | Save as |
 | `Ctrl+F` | Find and replace |
+| `Ctrl+Shift+C` / `Ctrl+Shift+V` | System clipboard |
 | `Ctrl+G` | Go to line |
-| `Ctrl+,` | Settings |
+| `Ctrl+I` / `Ctrl+,` | Settings |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | Font size |
 
 With Vim keybindings enabled, everything Vim binds works inside the text

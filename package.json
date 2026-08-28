@@ -1,7 +1,7 @@
 {
   "name": "rui",
   "private": true,
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "A lean text editor for snippets and notes",
   "license": "MIT",
   "author": "Jonas Gaiching",
@@ -33,6 +33,7 @@
     "@lezer/highlight": "^1.2.3",
     "@replit/codemirror-vim": "^6.4.0",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-opener": "^2"
   },

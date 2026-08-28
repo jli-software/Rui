@@ -76,7 +76,7 @@ export class StatusBar {
         <button class="status-btn status-eol" title="Zeilenende wählen"></button>
         <span class="status-divider"></span>
         <div class="status-tools">
-          <button class="status-icon status-settings" title="Einstellungen (Strg+,)" aria-label="Einstellungen">
+          <button class="status-icon status-settings" title="Einstellungen (Strg+I)" aria-label="Einstellungen">
             ${GEAR_SVG}
           </button>
         </div>

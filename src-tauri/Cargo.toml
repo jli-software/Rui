@@ -1,6 +1,6 @@
 [package]
 name = "rui"
-version = "0.2.5"
+version = "0.2.6"
 description = "A lean text editor for snippets and notes"
 authors = ["Jonas Gaiching"]
 edition = "2021"
@@ -37,6 +37,7 @@ notify = "6"
 # mit `clock` im Baum, kostet also nichts zusätzlich — und eine Notiz, die um
 # 23:30 entsteht, soll nicht auf den nächsten Tag datiert sein.
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+tauri-plugin-clipboard-manager = "2.3.2"
 
 [dev-dependencies]
 tempfile = "3"

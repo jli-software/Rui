@@ -56,6 +56,7 @@ const VIM_SHORTCUTS: ShortcutDef[] = [
   { title: "Unter einem Namen speichern", shortcut: ":w name.ps1" },
   { title: "Datei öffnen / neu laden", shortcut: ":e pfad / :e" },
   { title: "Schliessen ohne zu speichern", shortcut: ":q!" },
+  { title: "In die System-Zwischenablage kopieren / einfügen", shortcut: '"+y / "+p' },
 ];
 
 /**

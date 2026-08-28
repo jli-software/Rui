@@ -2,6 +2,8 @@ import { vim, getCM, Vim, type CodeMirror } from "@replit/codemirror-vim";
 import { Prec, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
+import { cachedText, refresh, write } from "./clipboard";
+
 /**
  * Die gesamte Anbindung an `@replit/codemirror-vim` sitzt in diesem Modul,
  * damit `editor.ts` es per `import("./vim")` als eigenen Chunk nachladen
@@ -56,7 +58,63 @@ const watched = new WeakSet<CodeMirror>();
  */
 export function vimExtension(host: VimHost): Extension {
   defineExCommands(host);
+  defineClipboardRegisters();
   return [vim(), cursorTheme];
+}
+
+/**
+ * `"+` und `"*` auf die System-Zwischenablage legen.
+ *
+ * Ohne das sind sie zwei gewöhnliche Register: `"+y` legt etwas hinein, das
+ * ausserhalb von Rui niemand sieht. Vim verhält sich mit einem
+ * Clipboard-fähigen Build genauso wie hier, und wer `"+y` tippt, meint auch
+ * genau das.
+ *
+ * Beide Namen zeigen auf dieselbe Ablage. Unter X11 sind `+` (Clipboard)
+ * und `*` (Primary Selection) verschieden; das Tauri-Plugin kennt nur die
+ * erste, und eine Primary Selection, die in Wirklichkeit das Clipboard ist,
+ * wäre irreführender als beide gleich zu behandeln.
+ */
+function defineClipboardRegisters() {
+  for (const name of ["+", "*"]) {
+    Vim.defineRegister(name, {
+      keyBuffer: [""],
+      insertModeChanges: [],
+      searchQueries: [],
+      linewise: false,
+      blockwise: false,
+      setText(text?: string, linewise?: boolean) {
+        this.linewise = !!linewise;
+        this.keyBuffer = [text ?? ""];
+        void write(text ?? "");
+      },
+      pushText(text: string, linewise?: boolean) {
+        this.linewise = !!linewise;
+        // Vim hängt beim Kopieren in ein Grossbuchstaben-Register an; für
+        // die Zwischenablage ist das der einzige Fall, in dem sich der
+        // bisherige Inhalt fortsetzt.
+        const combined = (this.keyBuffer[0] ?? "") + text;
+        this.keyBuffer = [combined];
+        void write(combined);
+      },
+      pushInsertModeChanges() {},
+      pushSearchQuery() {},
+      clear() {
+        this.keyBuffer = [""];
+        this.linewise = false;
+        void write("");
+      },
+      toString() {
+        // Der Zwischenspeicher aus `clipboard.ts`: Lesen ist asynchron,
+        // diese Methode ist es nicht. `watchMode` frischt ihn auf, sobald
+        // jemand `"` tippt — bis das Register drankommt, steht der aktuelle
+        // Inhalt bereit.
+        const text = cachedText();
+        this.keyBuffer = [text];
+        return text;
+      },
+    });
+  }
 }
 
 /**
@@ -174,7 +232,13 @@ export function watchMode(view: EditorView, report: (status: VimStatus | null) =
     // ist der Grund, warum `2d` in der Statusleiste mitläuft.
     cm.on("vim-mode-change", update);
     cm.on("vim-command-done", update);
-    cm.on("vim-keypress", update);
+    cm.on("vim-keypress", (key: string) => {
+      // `"` leitet die Registerauswahl ein — `"+p` folgt erst im nächsten
+      // Tastendruck. Genau dazwischen passt das Lesen der Zwischenablage,
+      // das asynchron ist und in `toString()` nicht mehr stattfinden kann.
+      if (key === '"') void refresh();
+      update();
+    });
   }
   report(readStatus(cm));
 }

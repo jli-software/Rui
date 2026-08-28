@@ -8,6 +8,7 @@ import { openSearchPanel } from "@codemirror/search";
 import { undo, redo } from "@codemirror/commands";
 
 import { RuiEditor } from "./editor";
+import { refresh as readClipboard, write as writeClipboard } from "./clipboard";
 import { CommandPalette, promptInput, type Command } from "./palette";
 import { QuickOpen } from "./quick-open";
 import { SettingsDialog } from "./settings-ui";
@@ -802,6 +803,36 @@ class App {
     await win.destroy();
   }
 
+  // ---- Zwischenablage ---------------------------------------------------
+
+  /**
+   * Strg+Umschalt+C und Strg+Umschalt+V — der Weg zur System-Zwischenablage,
+   * den man aus dem Terminal kennt.
+   *
+   * Sie sind nicht dasselbe wie `y` und `p`: Vims Register sind Ruis eigene
+   * und haben mit dem zu tun, was ausserhalb in der Zwischenablage liegt,
+   * erst einmal nichts. Wer beides verbinden will, nimmt in Vim `"+y` und
+   * `"+p` — auch die gehen an die System-Zwischenablage.
+   */
+  private copyToClipboard() {
+    const state = this.editor.view.state;
+    const text = state.selection.ranges
+      .filter((r) => !r.empty)
+      .map((r) => state.sliceDoc(r.from, r.to))
+      .join("\n");
+    // Ohne Auswahl gibt es nichts zu kopieren. Die aktuelle Zeile
+    // stattdessen zu nehmen wäre eine Vermutung, und eine überschriebene
+    // Zwischenablage lässt sich nicht zurückholen.
+    if (text) void writeClipboard(text);
+  }
+
+  private async pasteFromClipboard() {
+    const text = await readClipboard();
+    if (!text) return;
+    this.editor.view.dispatch(this.editor.view.state.replaceSelection(text));
+    this.editor.view.focus();
+  }
+
   private async gotoLine() {
     const answer = await promptInput("Gehe zu Zeile", "");
     const line = Number(answer);
@@ -880,6 +911,20 @@ class App {
         run: () => {
           openSearchPanel(this.editor.view);
         },
+      },
+      {
+        id: "edit.copy",
+        group: "Bearbeiten",
+        title: "In die Zwischenablage kopieren",
+        shortcut: "Strg+Umschalt+C",
+        run: () => this.copyToClipboard(),
+      },
+      {
+        id: "edit.paste",
+        group: "Bearbeiten",
+        title: "Aus der Zwischenablage einfügen",
+        shortcut: "Strg+Umschalt+V",
+        run: () => this.pasteFromClipboard(),
       },
       {
         id: "edit.goto",
@@ -962,7 +1007,7 @@ class App {
         id: "app.settings",
         group: "Rui",
         title: "Einstellungen…",
-        shortcut: "Strg+,",
+        shortcut: "Strg+I",
         run: () => this.settingsDialog.open(),
       },
     ];
@@ -996,6 +1041,8 @@ class App {
         if (e.shiftKey && key === "p") return run(() => this.palette.open());
         if (e.shiftKey && key === "o") return run(() => this.openFileDialog());
         if (e.shiftKey && key === "s") return run(() => this.saveAs());
+        if (e.shiftKey && key === "c") return run(() => this.copyToClipboard());
+        if (e.shiftKey && key === "v") return run(() => this.pasteFromClipboard());
         if (e.shiftKey) return;
 
         switch (key) {
@@ -1007,6 +1054,11 @@ class App {
             return run(() => this.save());
           case "g":
             return run(() => this.gotoLine());
+          // Strg+I neben Strg+O: die Datei mit dem einen, die Einstellungen
+          // mit dem anderen. Beide belegen in Vim die Sprungliste, aber
+          // Strg+O geht in Rui seit jeher an Quick Open — dann soll auch
+          // sein Gegenstück etwas tun, das man täglich braucht.
+          case "i":
           case ",":
             return run(() => this.settingsDialog.open());
           case "+":
@@ -1040,7 +1092,11 @@ class App {
 
     // Externe Änderungen prüfen, sobald das Fenster wieder aktiv wird.
     void win.onFocusChanged(({ payload: focused }) => {
-      if (focused) void this.checkExternalChange();
+      if (!focused) return;
+      void this.checkExternalChange();
+      // Wer draussen etwas kopiert hat, soll es hier mit `"+p` einfügen
+      // können, ohne dass der Zwischenspeicher erst veralten muss.
+      void readClipboard();
     });
 
     // Zweite Instanz hat eine Datei weitergereicht.
