@@ -31,6 +31,18 @@ export interface Palette {
   number: string;
   comment: string;
   func: string;
+  /**
+   * Eingebaute Namen: PowerShell-Cmdlets samt Aliassen, Shell-Builtins,
+   * `$PSScriptRoot` und Verwandtschaft. Bisher fielen die auf `variable`
+   * und hatten damit die Farbe des Fliesstexts — in einem Script, das zu
+   * neun Zehnteln aus Cmdlet-Aufrufen besteht, blieb dadurch fast alles
+   * grau.
+   */
+  builtin: string;
+  /** Operatoren: `-eq`, `|`, `+`. Getrennt von Klammern, die stumm bleiben. */
+  operator: string;
+  /** Shebang, Präprozessor, Direktiven — alles, was nicht Programm ist. */
+  meta: string;
   type: string;
   variable: string;
   heading: string;
@@ -58,6 +70,9 @@ export const sageLight: Palette = {
   number: "#a06a4d",
   comment: "#8d9a8d",
   func: "#4b7285",
+  builtin: "#3f7f77",
+  operator: "#8a6a94",
+  meta: "#7b8a94",
   type: "#8a7340",
   variable: "#2e3a30",
   heading: "#4a6a44",
@@ -85,6 +100,9 @@ export const sageDark: Palette = {
   number: "#d4a184",
   comment: "#6f7f6f",
   func: "#8fb9cd",
+  builtin: "#7cc3ba",
+  operator: "#c3aed6",
+  meta: "#93a5b1",
   type: "#cdb386",
   variable: "#d6e0d4",
   heading: "#a8c99d",
@@ -143,6 +161,12 @@ export function omarchyPalette(c: OmarchyColors, base: Palette): Palette {
     number: c.orange ?? c.yellow ?? base.number,
     comment: c.darkForeground ?? base.comment,
     func: c.blue ?? base.func,
+    // Cyan ist in Terminal-Paletten die Farbe, die Rui sonst nur für Links
+    // braucht — hier trägt sie mehr, weil Cmdlets in einem PowerShell-Script
+    // der häufigste Token überhaupt sind.
+    builtin: c.cyan ?? base.builtin,
+    operator: c.brown ?? c.magenta ?? base.operator,
+    meta: c.darkForeground ?? base.meta,
     type: c.yellow ?? base.type,
     variable: c.foreground ?? base.variable,
     heading: c.blue ?? base.heading,
@@ -168,13 +192,57 @@ function kebab(s: string) {
 function highlightStyle(p: Palette) {
   return HighlightStyle.define([
     { tag: [t.comment, t.lineComment, t.blockComment], color: p.comment, fontStyle: "italic" },
-    { tag: [t.keyword, t.modifier, t.controlKeyword, t.moduleKeyword], color: p.keyword },
-    { tag: [t.string, t.special(t.string), t.regexp], color: p.string },
-    { tag: [t.number, t.bool, t.null, t.atom], color: p.number },
-    { tag: [t.function(t.variableName), t.function(t.propertyName), t.labelName], color: p.func },
-    { tag: [t.typeName, t.className, t.namespace, t.annotation], color: p.type },
-    { tag: [t.variableName, t.propertyName, t.attributeName], color: p.variable },
-    { tag: [t.operator, t.punctuation, t.separator, t.bracket], color: p.muted },
+    // Der Shebang einer `.sh` und Direktiven wie `#Requires` hatten bisher
+    // gar keine Regel und blieben in der Textfarbe stehen.
+    { tag: [t.meta, t.docComment, t.processingInstruction], color: p.meta },
+    {
+      tag: [t.keyword, t.modifier, t.controlKeyword, t.moduleKeyword, t.definitionKeyword],
+      color: p.keyword,
+    },
+    { tag: [t.string, t.special(t.string), t.regexp, t.character], color: p.string },
+    // Escapes heben sich vom String ab: ein Zeilenumbruch im Text ist
+    // Code, kein Text.
+    { tag: [t.escape, t.number, t.bool, t.null, t.atom], color: p.number },
+    { tag: t.constant(t.variableName), color: p.number },
+    {
+      tag: [t.function(t.variableName), t.function(t.propertyName), t.labelName],
+      color: p.func,
+    },
+    // Cmdlets, Shell-Builtins und `$PSScriptRoot`: der häufigste Token in
+    // einem Script und bis hierher in der Farbe von gewöhnlichem Text.
+    {
+      tag: [t.standard(t.variableName), t.standard(t.propertyName)],
+      color: p.builtin,
+    },
+    {
+      tag: [t.typeName, t.className, t.namespace, t.annotation, t.special(t.variableName)],
+      color: p.type,
+    },
+    // Attributnamen trugen dieselbe Farbe wie der Text und waren in XML
+    // und HTML damit praktisch unsichtbar.
+    { tag: t.attributeName, color: p.type },
+    { tag: t.attributeValue, color: p.string },
+    { tag: [t.variableName, t.propertyName], color: p.variable },
+    // Operatoren tragen Bedeutung — `-eq`, `|`, `+` —, Klammern nicht.
+    // Beide dieselbe stumme Farbe zu geben, war der Hauptgrund, aus dem
+    // PowerShell nach zwei Farben aussah.
+    {
+      tag: [
+        t.operator,
+        t.derefOperator,
+        t.compareOperator,
+        t.logicOperator,
+        t.arithmeticOperator,
+        t.bitwiseOperator,
+        t.updateOperator,
+        t.definitionOperator,
+      ],
+      color: p.operator,
+    },
+    {
+      tag: [t.punctuation, t.separator, t.bracket, t.paren, t.brace, t.squareBracket, t.angleBracket],
+      color: p.muted,
+    },
     { tag: [t.definition(t.variableName)], color: p.text },
     { tag: t.invalid, color: p.invalid },
 

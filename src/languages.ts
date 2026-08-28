@@ -1,4 +1,4 @@
-import { StreamLanguage } from "@codemirror/language";
+import { StreamLanguage, type StreamParser } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
 
 /**
@@ -21,6 +21,40 @@ export interface LanguageDef {
 
 const stream = (mod: Promise<any>, key: string): Promise<Extension> =>
   mod.then((m) => StreamLanguage.define(m[key]));
+
+/**
+ * Ein Cmdlet-Name: `Get-ChildItem`, `Invoke-MgGraphRequest`, `New-ADUser`.
+ *
+ * Bewusst nur die Form — Verb, Bindestrich, Substantiv —, keine Liste.
+ * Genau darin liegt der Gewinn: Jedes Modul bringt eigene Cmdlets mit, und
+ * eine gepflegte Liste kennt keins davon.
+ */
+const CMDLET = /^[A-Z][A-Za-z]*-[A-Z][A-Za-z0-9]*$/;
+
+/**
+ * Legt über den PowerShell-Modus eine Erkennung für Cmdlets aus fremden
+ * Modulen.
+ *
+ * Der Modus aus `legacy-modes` prüft gegen eine fest eingebaute Liste der
+ * Standard-Cmdlets. Alles andere — `Get-MgUser`, `Get-ADUser`, jede selbst
+ * geschriebene Funktion — fällt auf `variable` zurück und bekommt damit die
+ * Farbe von gewöhnlichem Text. In einem Script, das zu weiten Teilen aus
+ * solchen Aufrufen besteht, blieb dadurch fast alles einfarbig.
+ *
+ * Der Text des gerade gelesenen Tokens steht in `stream.string` zwischen
+ * `start` und `pos`; passt er auf `Verb-Substantiv`, wird daraus ein
+ * `builtin` und bekommt die Cmdlet-Farbe.
+ */
+function withCmdlets(base: StreamParser<unknown>): StreamParser<unknown> {
+  return {
+    ...base,
+    token(stream, state) {
+      const type = base.token(stream, state);
+      if (type !== "variable") return type;
+      return CMDLET.test(stream.string.slice(stream.start, stream.pos)) ? "builtin" : type;
+    },
+  };
+}
 
 export const LANGUAGES: LanguageDef[] = [
   {
@@ -77,7 +111,10 @@ export const LANGUAGES: LanguageDef[] = [
     id: "powershell",
     name: "PowerShell",
     extensions: ["ps1", "psm1", "psd1"],
-    load: () => stream(import("@codemirror/legacy-modes/mode/powershell"), "powerShell"),
+    load: () =>
+      import("@codemirror/legacy-modes/mode/powershell").then((m) =>
+        StreamLanguage.define(withCmdlets(m.powerShell)),
+      ),
   },
   {
     id: "toml",

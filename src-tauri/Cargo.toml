@@ -1,6 +1,6 @@
 [package]
 name = "rui"
-version = "0.2.4"
+version = "0.2.5"
 description = "A lean text editor for snippets and notes"
 authors = ["Jonas Gaiching"]
 edition = "2021"

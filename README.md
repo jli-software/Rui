@@ -31,8 +31,11 @@ checksum published with each release if you want to be sure of what you got.
 
 - **Command palette** (`Ctrl+Shift+P`) instead of a menu bar, with the
   matching shortcut shown next to every command
-- **Syntax highlighting** for Rust, Go, Python, JSON, YAML, Markdown and more,
-  each language loaded as its own lazy chunk
+- **Syntax highlighting** for Rust, Go, Python, C#, PowerShell, shell, JSON,
+  YAML, Markdown and more, each language loaded as its own lazy chunk.
+  PowerShell recognises cmdlets by their `Verb-Noun` shape, so `Get-MgUser`
+  and `Get-ADUser` are coloured like `Get-ChildItem` — no built-in list to
+  fall out of date.
 - **Encoding aware** — detects BOM and encoding on open, remembers it along
   with the line ending, and restores both on save. A Windows-1252 file stays
   Windows-1252 instead of silently becoming UTF-8. Both are switchable from
