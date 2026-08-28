@@ -1,6 +1,7 @@
 mod decoration;
 mod document;
 mod omarchy;
+mod quick_open;
 mod settings;
 
 #[cfg(desktop)]
@@ -122,6 +123,7 @@ pub fn run() {
             document::save_file,
             document::save_note,
             document::file_mtime,
+            quick_open::list_note_files,
             settings::load_settings,
             settings::save_settings,
             settings::settings_path,

@@ -40,6 +40,8 @@ checksum published with each release if you want to be sure of what you got.
 - **Crash-safe writes** — saving goes through a temporary neighbouring file
   followed by a rename, so a crash mid-save cannot destroy your file
 - **Notes folder with instant save** — see below
+- **Quick Open** (`Ctrl+O`) lists every `.txt` and `.md` in the notes folder,
+  newest first, with fuzzy filtering and full keyboard navigation
 - **Vim keybindings**, off by default and switchable from the settings —
   normal, insert, visual and replace mode, with the current one shown on the
   left of the status bar. `:w`, `:wq`, `:x` and `:q` go through Rui's own
@@ -55,7 +57,9 @@ checksum published with each release if you want to be sure of what you got.
 | Shortcut | Action |
 |---|---|
 | `Ctrl+Shift+P` | Command palette |
-| `Ctrl+N` / `Ctrl+O` / `Ctrl+S` | New / Open / Save |
+| `Ctrl+N` / `Ctrl+S` | New / Save |
+| `Ctrl+O` | Quick Open from the notes folder |
+| `Ctrl+Shift+O` | Open another file with the system dialog |
 | `Ctrl+Shift+S` | Save as |
 | `Ctrl+F` | Find and replace |
 | `Ctrl+G` | Go to line |
@@ -73,6 +77,12 @@ Everything else lives in the command palette.
 Pick a notes folder in the settings and Rui keeps every open buffer saved on
 its own from then on — half a second after the last keystroke by default, no
 `Ctrl+S` needed. That delay is a setting.
+
+`Ctrl+O` opens Rui's own file picker for this folder. It searches `.txt` and
+`.md` recursively, starts with the most recently changed files, and is fully
+usable with typing, arrow keys, `Enter` and `Escape`. **Open another file…**
+in its footer, or `Ctrl+Shift+O`, keeps the native system dialog available for
+files elsewhere and for every other supported format.
 
 A new, still unnamed note takes its filename from the first line (whitespace
 becomes `_`, forbidden characters are dropped) and lands in that folder

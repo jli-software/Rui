@@ -16,7 +16,7 @@ export interface Command {
  * Frühe und zusammenhängende Treffer werden höher gewertet, damit die
  * naheliegende Aktion oben steht.
  */
-function score(needle: string, haystack: string): number {
+export function fuzzyScore(needle: string, haystack: string): number {
   if (!needle) return 1;
   const n = needle.toLowerCase();
   const h = haystack.toLowerCase();
@@ -88,7 +88,7 @@ export class CommandPalette {
   private filter() {
     const q = this.input.value.trim();
     this.matches = this.commands()
-      .map((c) => ({ c, s: score(q, `${c.group ?? ""} ${c.title}`) }))
+      .map((c) => ({ c, s: fuzzyScore(q, `${c.group ?? ""} ${c.title}`) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
       .map((x) => x.c);

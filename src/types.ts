@@ -48,6 +48,14 @@ export interface LoadedDocument {
   mtimeMs: number;
 }
 
+/** Spiegelt `quick_open::QuickOpenFile` auf der Rust-Seite. */
+export interface QuickOpenFile {
+  path: string;
+  name: string;
+  relativePath: string;
+  modifiedMs: number;
+}
+
 /** Spiegelt `settings::Settings` auf der Rust-Seite. */
 export interface Settings {
   theme: Theme;

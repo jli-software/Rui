@@ -16,6 +16,21 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.1.6] — 2026-08-28
+
+### Hinzugefügt
+- **Quick Open im Rui-Design** auf `Strg+O`: zeigt alle `.txt`- und
+  `.md`-Dateien aus dem Notizen-Ordner rekursiv an, zuletzt geänderte zuerst.
+  Tippen filtert mit derselben fehlertoleranten Teilfolgen-Suche wie die
+  Befehlspalette; Pfeiltasten, `Enter`, `Esc` und Maus funktionieren ohne
+  Griff zum nativen Dateidialog.
+- Jede Zeile zeigt Dateiname, relativen Ordner und Änderungszeit. Ein fehlender
+  Notizen-Ordner führt direkt zu den Einstellungen, eine leere Suche erklärt
+  ihren Zustand statt nur eine weisse Fläche zu zeigen.
+- **„Andere Datei öffnen…"** im Fuss des Quick Open und
+  `Strg+Umschalt+O` behalten den nativen Systemdialog für Dateien ausserhalb
+  des Notizen-Ordners und alle übrigen unterstützten Formate erreichbar.
+
 ## [0.1.5] — 2026-08-28
 
 ### Hinzugefügt
@@ -161,7 +176,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.5...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/vikingjunior12/Rui/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/vikingjunior12/Rui/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/vikingjunior12/Rui/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/vikingjunior12/Rui/compare/v0.1.2...v0.1.3

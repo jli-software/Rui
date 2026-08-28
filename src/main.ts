@@ -9,6 +9,7 @@ import { undo, redo } from "@codemirror/commands";
 
 import { RuiEditor } from "./editor";
 import { CommandPalette, promptInput, type Command } from "./palette";
+import { QuickOpen } from "./quick-open";
 import { SettingsDialog } from "./settings-ui";
 import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
@@ -20,6 +21,7 @@ import type {
   LineEnding,
   LoadedDocument,
   OmarchyColors,
+  QuickOpenFile,
   ResolvedDecoration,
   Session,
   Settings,
@@ -32,6 +34,7 @@ const ENCODINGS = ["UTF-8", "windows-1252", "ISO-8859-1", "UTF-16LE", "UTF-16BE"
 class App {
   private editor!: RuiEditor;
   private palette!: CommandPalette;
+  private quickOpen!: QuickOpen;
   private settingsDialog!: SettingsDialog;
   private status!: StatusBar;
   private titlebar!: TitleBar;
@@ -77,6 +80,16 @@ class App {
       () => void this.openSettingsFile(),
       () => void this.resetSettings(),
     );
+    this.quickOpen = new QuickOpen({
+      load: () => {
+        const folder = this.settings.notesFolder;
+        return folder ? invoke<QuickOpenFile[]>("list_note_files", { folder }) : Promise.resolve(null);
+      },
+      open: (path) => void this.openPath(path),
+      openNative: () => void this.openFileDialog(),
+      openSettings: () => this.settingsDialog.open(),
+      onClose: () => this.editor.view.focus(),
+    });
     this.status = new StatusBar(document.querySelector<HTMLElement>("#status")!, {
       onPosition: () => void this.gotoLine(),
       onLanguage: () => this.pickLanguage(),
@@ -654,8 +667,15 @@ class App {
       {
         id: "file.open",
         group: "Datei",
-        title: "Öffnen…",
+        title: "Notiz öffnen…",
         shortcut: "Strg+O",
+        run: () => this.quickOpen.open(),
+      },
+      {
+        id: "file.openNative",
+        group: "Datei",
+        title: "Andere Datei öffnen…",
+        shortcut: "Strg+Umschalt+O",
         run: () => this.openFileDialog(),
       },
       { id: "file.save", group: "Datei", title: "Speichern", shortcut: "Strg+S", run: () => this.save() },
@@ -793,8 +813,9 @@ class App {
         const mod = e.ctrlKey || e.metaKey;
         if (!mod) return;
 
-        // Was die Palette oder ein Dialog gerade selbst braucht, bleibt dort.
-        if (this.palette.isOpen && e.key !== "," ) return;
+        // Was ein Overlay gerade selbst braucht, bleibt dort.
+        if (this.quickOpen.isOpen) return;
+        if (this.palette.isOpen && e.key !== ",") return;
 
         const key = e.key.toLowerCase();
         const run = (fn: () => unknown) => {
@@ -804,6 +825,7 @@ class App {
         };
 
         if (e.shiftKey && key === "p") return run(() => this.palette.open());
+        if (e.shiftKey && key === "o") return run(() => this.openFileDialog());
         if (e.shiftKey && key === "s") return run(() => this.saveAs());
         if (e.shiftKey) return;
 
@@ -811,7 +833,7 @@ class App {
           case "n":
             return run(() => this.newFile());
           case "o":
-            return run(() => this.openFileDialog());
+            return run(() => this.quickOpen.open());
           case "s":
             return run(() => this.save());
           case "g":

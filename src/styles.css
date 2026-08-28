@@ -362,6 +362,114 @@ kbd {
   background: transparent;
 }
 
+/* ---- Quick Open ---- */
+
+.quick-open {
+  width: min(720px, calc(100vw - 48px));
+}
+
+.quick-open-head,
+.quick-open-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.quick-open-head {
+  padding: 9px 14px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.quick-open-head span:first-child {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.quick-open-list {
+  max-height: min(58vh, 520px);
+}
+
+.quick-open-item {
+  min-height: 48px;
+  padding-block: 6px;
+}
+
+.quick-open-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.quick-open-text strong,
+.quick-open-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-open-text strong {
+  font-weight: 550;
+}
+
+.quick-open-text small,
+.quick-open-time {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.quick-open-time {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.quick-open-item.is-active :is(small, .quick-open-time) {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.quick-open-hint {
+  min-height: 120px;
+  padding: 30px 14px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.quick-open-foot {
+  min-height: 36px;
+  padding: 7px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.quick-open-foot > span {
+  white-space: nowrap;
+}
+
+.quick-open-foot kbd + kbd {
+  margin-left: 2px;
+}
+
+.quick-open-foot .link-btn {
+  flex-shrink: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 620px) {
+  .quick-open-foot > span {
+    display: none;
+  }
+
+  .quick-open-foot {
+    justify-content: flex-end;
+  }
+}
+
 /* ---- Einstellungen ---- */
 
 .settings {
