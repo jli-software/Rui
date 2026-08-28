@@ -20,6 +20,19 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.3.4] — 2026-08-28
+
+### Behoben
+- **Der Linux-Build startete mit „Verbindung fehlgeschlagen"** statt mit dem
+  Editor. `scripts/build-release.sh` hat mit blossem `cargo build --release`
+  gebaut, und dabei fehlt das Cargo-Feature `custom-protocol`, das die
+  Tauri-CLI sonst selbst setzt. Ohne dieses Feature gilt die App als
+  Entwicklungs-Build: sie lädt ihr Frontend nicht aus dem eingebetteten
+  `dist/`, sondern von `http://localhost:1420` — wo nach dem Build niemand
+  mehr lauscht. Das Script baut jetzt über `npx tauri build --no-bundle`,
+  also denselben Weg, den das Windows-Script schon immer ging; nur dort fiel
+  es deshalb nie auf.
+
 ## [0.3.3] — 2026-08-28
 
 ### Hinzugefügt
@@ -439,7 +452,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.3...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/vikingjunior12/Rui/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/vikingjunior12/Rui/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/vikingjunior12/Rui/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/vikingjunior12/Rui/compare/v0.3.0...v0.3.1
