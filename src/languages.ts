@@ -23,7 +23,14 @@ const stream = (mod: Promise<any>, key: string): Promise<Extension> =>
   mod.then((m) => StreamLanguage.define(m[key]));
 
 export const LANGUAGES: LanguageDef[] = [
-  { id: "text", name: "Text", extensions: ["txt", "log", ""], load: null },
+  {
+    id: "text",
+    name: "Text",
+    // `out`, `err` und `trace` stehen hier, weil Logdateien der Grund sind,
+    // aus dem Rui überhaupt fremde Ordner durchsucht.
+    extensions: ["txt", "text", "log", "out", "err", "trace", "csv", "tsv", "nfo", ""],
+    load: null,
+  },
   {
     id: "markdown",
     name: "Markdown",
@@ -154,4 +161,16 @@ export function dialogFilters() {
     },
     { name: "Alle Dateien", extensions: ["*"] },
   ];
+}
+
+/**
+ * Endungen, die Quick Open auflisten soll.
+ *
+ * Bewusst dieselbe Quelle wie Syntax-Highlighting und Dateidialoge: Eine
+ * Sprache, die Rui einfärben kann, muss man auch finden können. Stünde die
+ * Liste zusätzlich in `quick_open.rs`, liefe sie beim nächsten neuen Modus
+ * auseinander.
+ */
+export function textFileExtensions(): string[] {
+  return [...new Set(LANGUAGES.flatMap((l) => l.extensions).filter((e) => e !== ""))];
 }

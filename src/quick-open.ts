@@ -4,6 +4,8 @@ import type { QuickOpenFile } from "./types";
 export interface QuickOpenActions {
   /** `null`: Es ist noch kein Notizen-Ordner eingerichtet. */
   load: () => Promise<QuickOpenFile[] | null>;
+  /** Der durchsuchte Ordner, für den Kopf des Fensters. */
+  scope: () => string | null;
   open: (path: string) => void;
   openNative: () => void;
   openSettings: () => void;
@@ -22,6 +24,7 @@ export class QuickOpen {
   private readonly input: HTMLInputElement;
   private readonly list: HTMLUListElement;
   private readonly hint: HTMLDivElement;
+  private readonly scope: HTMLElement;
   private files: QuickOpenFile[] = [];
   private matches: QuickOpenFile[] = [];
   private active = 0;
@@ -36,11 +39,11 @@ export class QuickOpen {
     this.root.innerHTML = `
       <div class="palette quick-open" role="dialog" aria-modal="true" aria-label="Datei öffnen">
         <header class="quick-open-head">
-          <span>Datei öffnen</span>
+          <span>Datei öffnen <small class="quick-open-scope"></small></span>
           <span>zuletzt geändert</span>
         </header>
         <input class="palette-input" type="text" spellcheck="false" autocomplete="off"
-               placeholder="Notiz suchen…" aria-label="Notiz suchen">
+               placeholder="Datei suchen…" aria-label="Datei suchen">
         <ul class="palette-list quick-open-list" role="listbox"></ul>
         <div class="quick-open-hint" hidden></div>
         <footer class="quick-open-foot">
@@ -53,6 +56,7 @@ export class QuickOpen {
     this.input = this.root.querySelector(".palette-input")!;
     this.list = this.root.querySelector(".quick-open-list")!;
     this.hint = this.root.querySelector(".quick-open-hint")!;
+    this.scope = this.root.querySelector(".quick-open-scope")!;
 
     this.input.addEventListener("input", () => this.filter());
     this.input.addEventListener("keydown", (event) => this.onKey(event));
@@ -72,6 +76,7 @@ export class QuickOpen {
   async open() {
     const generation = ++this.loadGeneration;
     this.root.hidden = false;
+    this.setScope(this.actions.scope());
     this.input.value = "";
     this.files = [];
     this.matches = [];
@@ -102,6 +107,17 @@ export class QuickOpen {
     ++this.loadGeneration;
     this.root.hidden = true;
     this.actions.onClose();
+  }
+
+  /**
+   * Zeigt an, worin gesucht wird.
+   *
+   * Ohne das bleibt beim Tippen offen, warum eine Datei fehlt, die es doch
+   * gibt — sie liegt schlicht ausserhalb des eingestellten Ordners.
+   */
+  private setScope(folder: string | null) {
+    this.scope.textContent = folder ? shortenPath(folder) : "";
+    this.scope.title = folder ?? "";
   }
 
   private filter() {
@@ -185,7 +201,7 @@ export class QuickOpen {
     }
 
     if (this.state === "error") return document.createTextNode(this.error);
-    if (this.files.length === 0) return document.createTextNode("Keine .txt- oder .md-Dateien gefunden.");
+    if (this.files.length === 0) return document.createTextNode("Keine Textdatei in diesem Ordner gefunden.");
     if (this.matches.length === 0) return document.createTextNode("Keine passende Datei gefunden.");
     return null;
   }
@@ -223,6 +239,17 @@ export class QuickOpen {
     this.close();
     this.actions.open(file.path);
   }
+}
+
+/**
+ * Kürzt einen Pfad auf die letzten beiden Teile.
+ *
+ * `C:\Users\jonas\Nextcloud\Notes` sagt im Kopf nichts, was
+ * `Nextcloud\Notes` nicht auch sagt — und der volle Pfad steht im `title`.
+ */
+function shortenPath(folder: string): string {
+  const parts = folder.split(/[\\/]/).filter(Boolean);
+  return parts.slice(-2).join("/");
 }
 
 function relativeFolder(relativePath: string): string {

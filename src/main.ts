@@ -14,7 +14,13 @@ import { SettingsDialog } from "./settings-ui";
 import { StatusBar } from "./statusbar";
 import { TitleBar } from "./titlebar";
 import { omarchyPalette, sageDark, sageLight } from "./theme";
-import { LANGUAGES, detectLanguage, dialogFilters, type LanguageDef } from "./languages";
+import {
+  LANGUAGES,
+  detectLanguage,
+  dialogFilters,
+  textFileExtensions,
+  type LanguageDef,
+} from "./languages";
 import type {
   Buffer,
   DecorationMode,
@@ -83,8 +89,14 @@ class App {
     this.quickOpen = new QuickOpen({
       load: () => {
         const folder = this.settings.notesFolder;
-        return folder ? invoke<QuickOpenFile[]>("list_note_files", { folder }) : Promise.resolve(null);
+        return folder
+          ? invoke<QuickOpenFile[]>("list_note_files", {
+              folder,
+              extensions: textFileExtensions(),
+            })
+          : Promise.resolve(null);
       },
+      scope: () => this.settings.notesFolder,
       open: (path) => void this.openPath(path),
       openNative: () => void this.openFileDialog(),
       openSettings: () => this.settingsDialog.open(),

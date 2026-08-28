@@ -40,8 +40,9 @@ checksum published with each release if you want to be sure of what you got.
 - **Crash-safe writes** — saving goes through a temporary neighbouring file
   followed by a rename, so a crash mid-save cannot destroy your file
 - **Notes folder with instant save** — see below
-- **Quick Open** (`Ctrl+O`) lists every `.txt` and `.md` in the notes folder,
-  newest first, with fuzzy filtering and full keyboard navigation
+- **Quick Open** (`Ctrl+O`) lists every text file in the notes folder — notes,
+  scripts, source files and logs alike — newest first, with fuzzy filtering
+  and full keyboard navigation
 - **Vim keybindings**, off by default and switchable from the settings —
   normal, insert, visual and replace mode, with the current one shown on the
   left of the status bar. `:w`, `:wq`, `:x` and `:q` go through Rui's own
@@ -78,11 +79,17 @@ Pick a notes folder in the settings and Rui keeps every open buffer saved on
 its own from then on — half a second after the last keystroke by default, no
 `Ctrl+S` needed. That delay is a setting.
 
-`Ctrl+O` opens Rui's own file picker for this folder. It searches `.txt` and
-`.md` recursively, starts with the most recently changed files, and is fully
-usable with typing, arrow keys, `Enter` and `Escape`. **Open another file…**
-in its footer, or `Ctrl+Shift+O`, keeps the native system dialog available for
-files elsewhere and for every other supported format.
+`Ctrl+O` opens Rui's own file picker for this folder. It searches recursively,
+starts with the most recently changed files, and is fully usable with typing,
+arrow keys, `Enter` and `Escape`. The folder being searched is named in its
+header. **Open another file…** in its footer, or `Ctrl+Shift+O`, keeps the
+native system dialog available for files elsewhere.
+
+Everything Rui can highlight, it can also find: `.txt`, `.md`, `.ps1`, `.sh`,
+`.rs`, `.cs`, `.py`, `.go`, `.json`, `.yaml` and the rest of the list, plus
+log files — including rotated ones such as `deploy.log.3`. Build output stays
+out of the way: `node_modules`, `target`, `dist`, `build`, `bin`, `obj` and
+dot-folders like `.git` are skipped.
 
 A new, still unnamed note takes its filename from the first line (whitespace
 becomes `_`, forbidden characters are dropped) and lands in that folder

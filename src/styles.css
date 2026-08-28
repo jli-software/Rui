@@ -385,8 +385,19 @@ kbd {
 }
 
 .quick-open-head span:first-child {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text);
   font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-open-scope {
+  color: var(--muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .quick-open-list {

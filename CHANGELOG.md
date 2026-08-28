@@ -6,7 +6,15 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
-### Geplant für 0.2
+### Geplant für 0.3 — Slices in dieser Reihenfolge
+- Quick Open stabil: Maus-Klick, Hover ohne Neuaufbau der Liste, grosse Listen
+- Zusätzliche Suchordner in den Einstellungen, Ordner der offenen Datei als
+  eigene Gruppe
+- Standard-Editor unter Windows: Endungen erweitern, Registrier-Knopf
+- Vim: Tastenkonflikte auflösen, `:e`, `:set` auf Ruis Einstellungen
+- Einstellungen zusätzlich auf `Strg+Umschalt+I`
+
+### Geplant für 0.4
 - Tabs (Puffer-Modell in `types.ts` ist vorbereitet)
 
 ### Geplant, ohne Termin
@@ -15,6 +23,36 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.2.0] — 2026-08-28
+
+### Geändert
+- **Quick Open findet jetzt jede Textdatei**, nicht mehr nur `.txt` und `.md`:
+  PowerShell- und Shell-Scripts, Rust, C#, Python, Go, JSON, YAML, TOML und
+  alles Weitere, das Rui einfärben kann — dazu Logdateien. Damit taugt
+  `Strg+O` auch zum Durchsehen von Logs und Quelltext und nicht nur für
+  Notizen.
+- Die Endungsliste kommt aus `languages.ts` und wird ans Rust-Kommando
+  übergeben. Sie steht damit an einer einzigen Stelle: Was Rui einfärben kann,
+  kann es auch finden, und ein neuer Sprachmodus wirkt sofort in beiden.
+- **Logdateien mit Rotation zählen mit** — `deploy.log.3` oder
+  `error.log.2026-08-28` haben keine brauchbare Endung mehr, sind aber genau
+  das, wofür man den Öffner aufmacht.
+- Endungslose Textdateien mit bekannten Namen (`README`, `LICENSE`,
+  `Dockerfile`, `Makefile`, `CHANGELOG`) kommen mit; alles andere ohne Endung
+  bleibt draussen, weil das unter Linux meist Binärdateien sind.
+
+### Hinzugefügt
+- **Der durchsuchte Ordner steht im Kopf des Fensters**, der volle Pfad im
+  Tooltip. Vorher blieb offen, warum eine Datei fehlt, die es doch gibt — sie
+  liegt schlicht ausserhalb des eingestellten Ordners.
+- **Baukram wird übersprungen:** `node_modules`, `target`, `dist`, `build`,
+  `out`, `bin`, `obj`, `vendor`, `venv`, `__pycache__` und alle Ordner mit
+  führendem Punkt. Ohne das ertränkt ein einziges Rust- oder Node-Projekt im
+  Suchordner die Liste.
+- Grenzen gegen Ausreisser: höchstens zwölf Ebenen tief und 20 000 Einträge.
+  Ein versehentlich eingestellter Pfad nahe der Laufwerkswurzel lässt Rui
+  damit nicht mehr endlos suchen.
 
 ## [0.1.6] — 2026-08-28
 
@@ -176,7 +214,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.1.6...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/vikingjunior12/Rui/compare/v0.1.6...v0.2.0
 [0.1.6]: https://github.com/vikingjunior12/Rui/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/vikingjunior12/Rui/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/vikingjunior12/Rui/compare/v0.1.3...v0.1.4

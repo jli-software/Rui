@@ -1,14 +1,57 @@
 //! Dateiliste für Ruis Quick Open.
 //!
 //! Der native Dateidialog bleibt für beliebige Pfade zuständig. Diese Liste
-//! bildet dagegen den schnellen Notizfluss ab: Text- und Markdown-Dateien aus
-//! dem eingestellten Notizen-Ordner, zuletzt geänderte zuerst.
+//! bildet dagegen den schnellen Wechsel zwischen Dateien ab, die man beim
+//! Arbeiten wirklich nacheinander aufmacht: Notizen, Scripts, Quelltext und
+//! Logdateien aus dem eingestellten Ordner, zuletzt geänderte zuerst.
+//!
+//! Welche Endungen dazugehören, entscheidet die Oberfläche und gibt sie mit —
+//! dieselbe Liste, aus der auch Syntax-Highlighting und die Dateidialoge
+//! entstehen (`languages.ts`). Eine zweite Aufzählung hier liefe beim nächsten
+//! neuen Sprachmodus auseinander.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use serde::Serialize;
+
+/// Wie tief die Suche steigt. Notizordner sind flach; die Grenze schützt vor
+/// einem versehentlich eingestellten Pfad nahe der Laufwerkswurzel.
+const MAX_DEPTH: usize = 12;
+
+/// Obergrenze für die Liste. Darüber hinaus hilft Scrollen ohnehin nicht mehr
+/// weiter — dann filtert man.
+const MAX_FILES: usize = 20_000;
+
+/// Ordner, die fast nie das enthalten, was man sucht, aber sehr viel davon.
+/// Ordner mit führendem Punkt fallen zusätzlich generisch weg; damit sind
+/// `.git`, `.venv`, `.cache` und `.idea` miterledigt.
+const SKIPPED_DIRS: [&str; 10] = [
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    "out",
+    "bin",
+    "obj",
+    "vendor",
+    "venv",
+    "__pycache__",
+];
+
+/// Dateien ohne Endung, die trotzdem Text sind. Alles andere ohne Endung
+/// bleibt draussen: unter Linux sind das meist Binärdateien.
+const BARE_NAMES: [&str; 7] = [
+    "dockerfile",
+    "makefile",
+    "license",
+    "licence",
+    "readme",
+    "changelog",
+    "authors",
+];
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,14 +63,22 @@ pub struct QuickOpenFile {
 }
 
 #[tauri::command]
-pub fn list_note_files(folder: String) -> Result<Vec<QuickOpenFile>, String> {
+pub fn list_note_files(
+    folder: String,
+    extensions: Vec<String>,
+) -> Result<Vec<QuickOpenFile>, String> {
     let root = absolute_path(PathBuf::from(folder))?;
     if !root.is_dir() {
-        return Err(format!("Notizen-Ordner nicht gefunden: {}", root.display()));
+        return Err(format!("Ordner nicht gefunden: {}", root.display()));
     }
 
+    let wanted: HashSet<String> = extensions
+        .into_iter()
+        .map(|e| e.trim_start_matches('.').to_ascii_lowercase())
+        .collect();
+
     let mut files = Vec::new();
-    collect_files(&root, &root, &mut files)?;
+    collect_files(&root, &root, &wanted, 0, &mut files)?;
     sort_files(&mut files);
     Ok(files)
 }
@@ -51,23 +102,36 @@ fn absolute_path(path: PathBuf) -> Result<PathBuf, String> {
         .map_err(|e| format!("Arbeitsverzeichnis nicht lesbar: {e}"))
 }
 
-fn collect_files(root: &Path, dir: &Path, files: &mut Vec<QuickOpenFile>) -> Result<(), String> {
+fn collect_files(
+    root: &Path,
+    dir: &Path,
+    wanted: &HashSet<String>,
+    depth: usize,
+    files: &mut Vec<QuickOpenFile>,
+) -> Result<(), String> {
     let entries = fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
 
     for entry in entries.flatten() {
+        if files.len() >= MAX_FILES {
+            return Ok(());
+        }
         let Ok(file_type) = entry.file_type() else {
             continue;
         };
         let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
 
         // Symlink-Verzeichnisse werden absichtlich nicht verfolgt: Ein Link
         // zurück nach oben dürfte die Suche sonst endlos laufen lassen.
         if file_type.is_dir() {
+            if depth + 1 > MAX_DEPTH || is_skipped_dir(&name) {
+                continue;
+            }
             // Ein unlesbarer Unterordner soll nicht die ganze Liste blockieren.
-            let _ = collect_files(root, &path, files);
+            let _ = collect_files(root, &path, wanted, depth + 1, files);
             continue;
         }
-        if !file_type.is_file() || !is_note_file(&path) {
+        if !file_type.is_file() || !is_text_file(&name, wanted) {
             continue;
         }
 
@@ -82,7 +146,7 @@ fn collect_files(root: &Path, dir: &Path, files: &mut Vec<QuickOpenFile>) -> Res
 
         files.push(QuickOpenFile {
             path: path.to_string_lossy().into_owned(),
-            name: entry.file_name().to_string_lossy().into_owned(),
+            name,
             relative_path: relative.to_string_lossy().into_owned(),
             modified_ms,
         });
@@ -90,10 +154,26 @@ fn collect_files(root: &Path, dir: &Path, files: &mut Vec<QuickOpenFile>) -> Res
     Ok(())
 }
 
-fn is_note_file(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| matches!(ext.to_ascii_lowercase().as_str(), "txt" | "md"))
+fn is_skipped_dir(name: &str) -> bool {
+    name.starts_with('.') || SKIPPED_DIRS.contains(&name.to_ascii_lowercase().as_str())
+}
+
+/// Ob eine Datei in die Liste gehört.
+///
+/// Neben der Endung zählt der Name: Ein rotiertes `deploy.log.3` oder
+/// `error.log.2026-08-28` hat keine brauchbare Endung mehr, ist aber genau
+/// das, wofür man den Öffner aufmacht.
+fn is_text_file(name: &str, wanted: &HashSet<String>) -> bool {
+    let lower = name.to_ascii_lowercase();
+    if lower.contains(".log") {
+        return true;
+    }
+
+    match lower.rsplit_once('.') {
+        // Ohne Punkt im Namen: nur die bekannten endungslosen Textdateien.
+        None => BARE_NAMES.contains(&lower.as_str()),
+        Some((_, ext)) => wanted.contains(ext),
+    }
 }
 
 #[cfg(test)]
@@ -101,29 +181,73 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    #[test]
-    fn findet_txt_und_md_rekursiv_aber_keinen_code() {
+    fn extensions() -> Vec<String> {
+        ["txt", "md", "rs", "ps1", "log"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    fn temp_root(label: &str) -> PathBuf {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("rui-quick-open-{unique}"));
+        std::env::temp_dir().join(format!("rui-quick-open-{label}-{unique}"))
+    }
+
+    #[test]
+    fn findet_notizen_scripts_und_quelltext_rekursiv() {
+        let root = temp_root("mischung");
         let nested = root.join("Unterordner");
         fs::create_dir_all(&nested).unwrap();
         fs::write(root.join("Heute.md"), "# Heute").unwrap();
         fs::write(nested.join("Idee.TXT"), "Idee").unwrap();
         fs::write(root.join("main.rs"), "fn main() {}").unwrap();
+        fs::write(root.join("Deploy.ps1"), "Write-Host").unwrap();
+        fs::write(root.join("bild.png"), "kein Text").unwrap();
 
-        let files = list_note_files(root.to_string_lossy().into_owned()).unwrap();
+        let files = list_note_files(root.to_string_lossy().into_owned(), extensions()).unwrap();
         let mut relative: Vec<_> = files.iter().map(|f| f.relative_path.as_str()).collect();
         relative.sort_unstable();
 
-        assert_eq!(relative.len(), 2);
+        assert_eq!(relative.len(), 4);
         assert!(relative.contains(&"Heute.md"));
+        assert!(relative.contains(&"main.rs"));
+        assert!(relative.contains(&"Deploy.ps1"));
         assert!(relative.iter().any(|p| p.ends_with("Idee.TXT")));
+        assert!(!relative.iter().any(|p| p.ends_with("bild.png")));
         assert!(files.iter().all(|f| Path::new(&f.path).is_absolute()));
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn ueberspringt_ordner_voller_baukram() {
+        let root = temp_root("baukram");
+        fs::create_dir_all(root.join("node_modules")).unwrap();
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::write(root.join("node_modules").join("index.rs"), "").unwrap();
+        fs::write(root.join(".git").join("COMMIT_EDITMSG.txt"), "").unwrap();
+        fs::write(root.join("Notiz.md"), "").unwrap();
+
+        let files = list_note_files(root.to_string_lossy().into_owned(), extensions()).unwrap();
+
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].name, "Notiz.md");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rotierte_logdateien_zaehlen_trotz_fehlender_endung() {
+        let wanted: HashSet<String> = extensions().into_iter().collect();
+
+        assert!(is_text_file("deploy.log.3", &wanted));
+        assert!(is_text_file("error.log.2026-08-28", &wanted));
+        assert!(is_text_file("README", &wanted));
+        assert!(!is_text_file("rui.exe", &wanted));
+        assert!(!is_text_file("werkzeug", &wanted));
     }
 
     #[test]
@@ -150,7 +274,8 @@ mod tests {
 
     #[test]
     fn fehlender_ordner_liefert_einen_verstaendlichen_fehler() {
-        let err = list_note_files("definitiv-nicht-vorhanden-rui".to_string()).unwrap_err();
-        assert!(err.contains("Notizen-Ordner nicht gefunden"));
+        let err =
+            list_note_files("definitiv-nicht-vorhanden-rui".to_string(), extensions()).unwrap_err();
+        assert!(err.contains("Ordner nicht gefunden"));
     }
 }
