@@ -772,3 +772,10 @@ kbd {
   background: var(--muted);
   background-clip: content-box;
 }
+
+.quick-open-more {
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}

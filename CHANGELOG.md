@@ -7,7 +7,6 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Geplant für 0.3 — Slices in dieser Reihenfolge
-- Quick Open stabil: Maus-Klick, Hover ohne Neuaufbau der Liste, grosse Listen
 - Zusätzliche Suchordner in den Einstellungen, Ordner der offenen Datei als
   eigene Gruppe
 - Standard-Editor unter Windows: Endungen erweitern, Registrier-Knopf
@@ -23,6 +22,27 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.2.1] — 2026-08-28
+
+### Behoben
+- **Ein Klick im Quick Open öffnet die Datei wieder.** Jedes Überfahren mit
+  der Maus baute bisher die ganze Liste neu auf und scrollte sie danach — der
+  Eintrag unter dem Zeiger war beim Klick also längst ein anderes Element,
+  und die Liste sprang zusätzlich weg. Das Überfahren hängt jetzt nur noch
+  die Hervorhebung um, gescrollt wird ausschliesslich bei Navigation über die
+  Tastatur.
+
+### Hinzugefügt
+- **`Bild↑`, `Bild↓`, `Pos1` und `Ende`** im Quick Open. Durch eine lange
+  Liste kommt man damit, ohne die Pfeiltaste gedrückt zu halten; anders als
+  die Pfeiltasten laufen sie nicht um, weil das an den Enden nur verwirrt.
+
+### Geändert
+- Die Liste baut höchstens 500 Einträge. Der Ordner darf 20 000 Dateien
+  haben — ebenso viele Zeilen bei jedem Tastendruck neu aufzubauen macht das
+  Tippen zäh. Eine Zeile am Fuss nennt, wie viele Treffer noch dahinter
+  liegen; die Suche kommt an sie heran.
 
 ## [0.2.0] — 2026-08-28
 
@@ -214,7 +234,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.2.0...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/vikingjunior12/Rui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/vikingjunior12/Rui/compare/v0.1.6...v0.2.0
 [0.1.6]: https://github.com/vikingjunior12/Rui/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/vikingjunior12/Rui/compare/v0.1.4...v0.1.5

@@ -1,6 +1,16 @@
 import { fuzzyScore } from "./palette";
 import type { QuickOpenFile } from "./types";
 
+/**
+ * Wie viele Treffer die Liste tatsächlich baut.
+ *
+ * Der Notizen-Ordner darf gross sein — 20 000 Einträge lässt `quick_open.rs`
+ * zu. Ebenso viele `<li>` bei jedem Tastendruck neu zu bauen macht das
+ * Tippen zäh, und wer über tausend Zeilen hinaus scrollt, sucht ohnehin
+ * besser mit der Tastatur. Was darüber liegt, sagt eine Zeile am Fuss.
+ */
+const RENDER_LIMIT = 500;
+
 export interface QuickOpenActions {
   /** `null`: Es ist noch kein Notizen-Ordner eingerichtet. */
   load: () => Promise<QuickOpenFile[] | null>;
@@ -27,6 +37,8 @@ export class QuickOpen {
   private readonly scope: HTMLElement;
   private files: QuickOpenFile[] = [];
   private matches: QuickOpenFile[] = [];
+  /** Der tatsächlich gebaute Ausschnitt aus `matches`. */
+  private visible: QuickOpenFile[] = [];
   private active = 0;
   private loadGeneration = 0;
   private state: "loading" | "ready" | "no-folder" | "error" = "ready";
@@ -80,6 +92,7 @@ export class QuickOpen {
     this.input.value = "";
     this.files = [];
     this.matches = [];
+    this.visible = [];
     this.active = 0;
     this.state = "loading";
     this.render();
@@ -133,6 +146,7 @@ export class QuickOpen {
           .sort((a, b) => b.score - a.score || a.index - b.index)
           .map((match) => match.file)
       : [...this.files];
+    this.visible = this.matches.slice(0, RENDER_LIMIT);
     this.active = 0;
     this.render();
   }
@@ -148,38 +162,69 @@ export class QuickOpen {
     }
 
     this.hint.replaceChildren();
-    this.list.replaceChildren(
-      ...this.matches.map((file, index) => {
-        const item = document.createElement("li");
-        item.className = "palette-item quick-open-item" + (index === this.active ? " is-active" : "");
-        item.setAttribute("role", "option");
-        item.setAttribute("aria-selected", String(index === this.active));
+    const items: HTMLLIElement[] = this.visible.map((file, index) => {
+      const item = document.createElement("li");
+      item.className = "palette-item quick-open-item" + (index === this.active ? " is-active" : "");
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", String(index === this.active));
 
-        const text = document.createElement("span");
-        text.className = "quick-open-text";
-        const name = document.createElement("strong");
-        name.textContent = file.name;
-        const path = document.createElement("small");
-        path.textContent = relativeFolder(file.relativePath);
-        text.append(name, path);
+      const text = document.createElement("span");
+      text.className = "quick-open-text";
+      const name = document.createElement("strong");
+      name.textContent = file.name;
+      const path = document.createElement("small");
+      path.textContent = relativeFolder(file.relativePath);
+      text.append(name, path);
 
-        const modified = document.createElement("time");
-        modified.className = "quick-open-time";
-        modified.dateTime = new Date(file.modifiedMs).toISOString();
-        modified.textContent = formatModified(file.modifiedMs);
+      const modified = document.createElement("time");
+      modified.className = "quick-open-time";
+      modified.dateTime = new Date(file.modifiedMs).toISOString();
+      modified.textContent = formatModified(file.modifiedMs);
 
-        item.append(text, modified);
-        item.addEventListener("mouseenter", () => {
-          this.active = index;
-          this.render();
-        });
-        item.addEventListener("mousedown", (event) => {
-          event.preventDefault();
-          this.execute(file);
-        });
-        return item;
-      }),
-    );
+      item.append(text, modified);
+      // Kein `render()` beim Überfahren: Es baute die Liste neu, und der
+      // Eintrag unter dem Zeiger wäre beim Klick schon ein anderes Element.
+      // Genau daran scheiterte die Maus bis 0.2.0.
+      item.addEventListener("mouseenter", () => this.setActive(index, false));
+      item.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        this.execute(file);
+      });
+      return item;
+    });
+
+    const rest = this.matches.length - this.visible.length;
+    if (rest > 0) {
+      const more = document.createElement("li");
+      more.className = "quick-open-more";
+      more.textContent = `… und ${rest} weitere — Suche eingrenzen`;
+      items.push(more);
+    }
+
+    this.list.replaceChildren(...items);
+    this.scrollToActive();
+  }
+
+  /**
+   * Hebt einen Eintrag hervor, ohne die Liste neu zu bauen.
+   *
+   * `scroll` bleibt der Tastatur vorbehalten: Scrollte die Liste auch beim
+   * Überfahren, spränge sie unter dem Zeiger weg.
+   */
+  private setActive(index: number, scroll: boolean) {
+    if (index === this.active || index < 0 || index >= this.visible.length) return;
+    for (const at of [this.active, index]) {
+      const item = this.list.children[at];
+      if (!(item instanceof HTMLElement)) continue;
+      const isActive = at === index;
+      item.classList.toggle("is-active", isActive);
+      item.setAttribute("aria-selected", String(isActive));
+    }
+    this.active = index;
+    if (scroll) this.scrollToActive();
+  }
+
+  private scrollToActive() {
     this.list.children[this.active]?.scrollIntoView({ block: "nearest" });
   }
 
@@ -220,19 +265,41 @@ export class QuickOpen {
         event.preventDefault();
         this.move(-1);
         break;
+      case "PageDown":
+        event.preventDefault();
+        this.jump(this.active + 10);
+        break;
+      case "PageUp":
+        event.preventDefault();
+        this.jump(this.active - 10);
+        break;
+      case "Home":
+        event.preventDefault();
+        this.jump(0);
+        break;
+      case "End":
+        event.preventDefault();
+        this.jump(this.visible.length - 1);
+        break;
       case "Enter": {
         event.preventDefault();
-        const file = this.matches[this.active];
+        const file = this.visible[this.active];
         if (file) this.execute(file);
         break;
       }
     }
   }
 
+  /** Pfeiltasten laufen um, damit das letzte Ergebnis nah am ersten liegt. */
   private move(delta: number) {
-    if (this.matches.length === 0) return;
-    this.active = (this.active + delta + this.matches.length) % this.matches.length;
-    this.render();
+    if (this.visible.length === 0) return;
+    this.setActive((this.active + delta + this.visible.length) % this.visible.length, true);
+  }
+
+  /** Seitenweise und an die Enden — hier wäre Umlaufen nur verwirrend. */
+  private jump(index: number) {
+    if (this.visible.length === 0) return;
+    this.setActive(Math.max(0, Math.min(index, this.visible.length - 1)), true);
   }
 
   private execute(file: QuickOpenFile) {
