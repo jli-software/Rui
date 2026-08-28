@@ -20,6 +20,60 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.3.6] — 2026-08-28
+
+### Behoben
+- **`:w` ohne Dateinamen schrieb eine Datei namens `w`.** Rui hat das
+  Argument eines Ex-Befehls aus `params.input` gelesen, wenn `argString`
+  fehlte — `input` ist aber die ganze getippte Zeile und nicht der Teil
+  hinter dem Befehl. Bei `:w` stand darin schlicht `w`, und Rui hielt den
+  Befehlsnamen für einen Dateinamen. Dasselbe traf `:wq` (Datei `wq`) und
+  `:e` ohne Pfad, das damit statt eines Neuladens eine Datei `e` öffnen
+  wollte. `:w name.md` war nie betroffen — da steht ein `argString` da.
+  Ein namenloser Puffer geht bei `:w` jetzt wieder den Weg von Strg+S: in
+  den Notizen-Ordner, und ohne einen solchen in den Dateidialog.
+- **Die Hälfte des Omarchy-Themes kam nie an.** `OmarchyColors` trug
+  `rename_all = "camelCase"`, und das gilt bei serde in beide Richtungen —
+  also auch beim Lesen von `colors.toml`, wo die Schlüssel
+  `dark_foreground`, `lighter_background` und so weiter heissen. Alle
+  zweiwortigen Felder blieben leer, und weil `#[serde(default)]` daraus
+  keinen Fehler macht, füllte Rui sie still aus seinem eigenen
+  Sage-Farbschema: Grünes im blauen Tokyo Night, an Schaltern,
+  Beschriftungen und Dialogflächen. Gelesen wird jetzt `snake_case`,
+  ausgeliefert weiterhin `camelCase` — mit Tests für beide Richtungen.
+
+### Geändert
+- **Die Oberflächenfarben eines Omarchy-Themes werden geprüft, nicht nur
+  übernommen.** Eine Terminal-Palette sagt, was ein Theme für „grün" hält,
+  aber nichts darüber, ob zwei Farben nebeneinander lesbar bleiben. Rui
+  rechnet jetzt nach:
+  - **Dialoge liegen wieder über dem Text.** Für Einstellungen und
+    Schnellöffnen galt `darker_background` — bei Tokyo Night `#0e0e14` und
+    damit dunkler als der Editor. Die Flächen bilden jetzt eine Leiter
+    (Text → Statusleiste → Dialog), die immer in dieselbe Richtung führt.
+  - **Beschriftungen sind lesbar.** Die gedämpfte Schrift kam aus
+    `dark_foreground`, der Kommentarfarbe des Themes; auf der Statusleiste
+    ergab das bei Everforest ein Kontrastverhältnis von 1.5:1. Sie wird
+    jetzt so weit zur Vordergrundfarbe verschoben, bis 4.5:1 stehen — über
+    alle 22 mitgelieferten Themes hinweg, ohne den Charakter zu verlieren.
+  - **Die Auswahl ist sichtbar.** Themes, deren Selektionsfarbe fast auf
+    dem Hintergrund liegt, bekommen einen Mindestabstand.
+- **Vims Kommandozeile trägt Ruis Farben.** Das Eingabefeld für `:` und `/`
+  hatte vom Vim-Paket nur `background: inherit` — Textfarbe und Schrift
+  erbt ein `<input>` aber nicht, die kamen vom Browser und rechneten mit
+  einem hellen Formular. In dunklen Themes stand die getippte Zeile fast
+  schwarz auf dunkelgrau. Vims Meldungen („Invalid command") kamen in
+  einem festen Rot und tragen jetzt die Signalfarbe des Themes.
+
+### Hinzugefügt
+- **Rückmeldung nach dem Speichern.** In der Statusleiste steht kurz
+  `„notiz.md" geschrieben`, dann verschwindet sie wieder. Vim beantwortet
+  ein `:w` mit einer Zeile über die geschriebene Datei; Rui hatte darauf
+  gar keine Antwort — ob etwas passiert ist, liess sich nur daran ablesen,
+  dass „Geändert" verschwand, und bei einer unveränderten Datei nicht
+  einmal daran. Bei einem Puffer, der seinen Namen erst beim Speichern
+  bekommt, ist das ausserdem die einzige Stelle, an der man ihn erfährt.
+
 ## [0.3.5] — 2026-08-28
 
 ### Hinzugefügt
@@ -483,7 +537,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.5...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.6...HEAD
+[0.3.6]: https://github.com/vikingjunior12/Rui/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/vikingjunior12/Rui/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/vikingjunior12/Rui/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/vikingjunior12/Rui/compare/v0.3.2...v0.3.3

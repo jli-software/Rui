@@ -341,17 +341,31 @@ function itemFolder(file: QuickOpenFile): string {
   return separator < 0 ? root : `${root}/${relative.slice(0, separator)}`;
 }
 
+/**
+ * Uhrzeit im 24-Stunden-Format, unabhängig von der Systemsprache.
+ *
+ * `toLocaleTimeString([])` nimmt die Locale des Systems — steht die auf
+ * Englisch, stand neben „Heute" ein „10:42 PM". Die Oberfläche ist
+ * deutsch, also ist es auch die Uhrzeit.
+ */
+const TIME_FORMAT = new Intl.DateTimeFormat("de-CH", { hour: "2-digit", minute: "2-digit" });
+const DATE_FORMAT = new Intl.DateTimeFormat("de-CH", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
 function formatModified(modifiedMs: number): string {
   const date = new Date(modifiedMs);
   const now = new Date();
   const sameDay = date.toDateString() === now.toDateString();
   if (sameDay) {
-    return `Heute ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    return `Heute ${TIME_FORMAT.format(date)}`;
   }
 
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) {
-    return `Gestern ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    return `Gestern ${TIME_FORMAT.format(date)}`;
   }
-  return date.toLocaleDateString([], { day: "2-digit", month: "2-digit", year: "numeric" });
+  return DATE_FORMAT.format(date);
 }

@@ -282,6 +282,15 @@ class App {
    * Fehler, den Autosave-an-Notizen-Ordner gemacht hat.
    */
   private async save(target?: string): Promise<boolean> {
+    const ok = await this.saveInternal(target);
+    // Ohne Rückmeldung sagt ein `:w` nichts darüber, ob und wohin
+    // geschrieben wurde — bei einem Puffer, der seinen Namen erst beim
+    // Speichern bekommt, ist genau das die Frage.
+    if (ok && this.buffer.path) this.status.flash(`„${shortName(this.buffer.path)}" geschrieben`);
+    return ok;
+  }
+
+  private saveInternal(target?: string): Promise<boolean> {
     if (target !== undefined) return this.saveTo(target);
     if (this.buffer.path) return this.writeTo(this.buffer.path);
     if (this.settings.notesFolder) return this.saveNote();

@@ -110,14 +110,105 @@ export const sageDark: Palette = {
   invalid: "#d08b80",
 };
 
-/** Grob genug für die einzige Frage, die hier zählt: heller oder dunkler Text? */
-function contrastText(hex: string, dark: string, light: string): string {
-  const n = parseInt(hex.replace("#", ""), 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6 ? dark : light;
+// ---- Farbrechnen ---------------------------------------------------------
+//
+// Omarchys `colors.toml` ist eine Terminal-Palette: sie sagt, welche Farbe
+// ein Theme für „grün" hält, aber nichts darüber, ob zwei davon
+// nebeneinander noch lesbar sind. Ein Editor braucht genau das — deshalb
+// leitet Rui die Oberflächen-Rollen nicht mehr stur ab, sondern prüft sie
+// gegen den Untergrund, auf dem sie tatsächlich landen.
+
+interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/** `#rgb` und `#rrggbb`; alles andere gibt `null`, damit der Aufrufer den Rückfall nimmt. */
+function parseHex(hex: string): Rgb | null {
+  const text = hex.trim().replace(/^#/, "");
+  const full =
+    text.length === 3
+      ? text
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : text;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return null;
+  const n = parseInt(full, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function toHex({ r, g, b }: Rgb): string {
+  const part = (v: number) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0");
+  return `#${part(r)}${part(g)}${part(b)}`;
+}
+
+/** `t = 0` ergibt `a`, `t = 1` ergibt `b`. Ungültige Farben geben `a` zurück. */
+function mix(a: string, b: string, t: number): string {
+  const x = parseHex(a);
+  const y = parseHex(b);
+  if (!x || !y) return a;
+  return toHex({
+    r: x.r + (y.r - x.r) * t,
+    g: x.g + (y.g - x.g) * t,
+    b: x.b + (y.b - x.b) * t,
+  });
+}
+
+/** Relative Leuchtdichte nach WCAG — die Grundlage jedes Kontrastwerts. */
+function luminance(hex: string): number {
+  const c = parseHex(hex);
+  if (!c) return 0;
+  const channel = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
+}
+
+/** WCAG-Kontrastverhältnis, 1 (gleich) bis 21 (Schwarz auf Weiss). */
+function contrast(a: string, b: string): number {
+  const x = luminance(a);
+  const y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/**
+ * Hebt `color` so weit Richtung `toward` an, bis sie auf `on` das
+ * geforderte Verhältnis erreicht.
+ *
+ * Der Fall, für den das hier steht: Tokyo Nights `dark_foreground`
+ * (`#565f89`) ist als Kommentarfarbe im Code richtig — auf der
+ * Statusleiste (`#24283b`) kommt sie auf ein Verhältnis von rund 2:1 und
+ * ist damit kaum noch zu lesen. Statt die Themenfarbe zu verwerfen, wird
+ * sie in Schritten zur Vordergrundfarbe verschoben, bis sie reicht: Das
+ * Theme bleibt erkennbar, der Text lesbar.
+ */
+function ensureContrast(color: string, on: string, ratio: number, toward: string): string {
+  if (!parseHex(color) || !parseHex(on)) return color;
+  let result = color;
+  for (let step = 0; step <= 10 && contrast(result, on) < ratio; step++) {
+    result = mix(color, toward, step / 10);
+  }
+  return result;
+}
+
+/** Wählt zwischen zwei Textfarben die, die auf `bg` besser lesbar ist. */
+function contrastText(bg: string, dark: string, light: string): string {
+  return contrast(bg, dark) >= contrast(bg, light) ? dark : light;
+}
+
+/**
+ * Eine Fläche eine Stufe „höher" legen: im dunklen Theme heller, im hellen
+ * Theme näher an Weiss.
+ *
+ * `amount` ist der Mischanteil, nicht die Helligkeit — bei sehr dunklen
+ * Untergründen wirkt derselbe Wert stärker, und das ist gewollt: Die
+ * Abstufungen sollen sichtbar sein, nicht rechnerisch gleich gross.
+ */
+function lift(hex: string, amount: number, dark: boolean): string {
+  return mix(hex, dark ? "#ffffff" : "#000000", amount);
 }
 
 /**
@@ -129,50 +220,87 @@ function contrastText(hex: string, dark: string, light: string): string {
  * auch andere Editoren mit Base16-artigen Paletten machen. Fehlt ein Feld
  * (nicht jedes Theme definiert alle), fällt die jeweilige Rolle auf `base`
  * zurück, statt eine undefinierte Farbe zu zeigen.
+ *
+ * Die Syntaxfarben werden dabei übernommen, wie das Theme sie meint. Die
+ * Farben der Oberfläche dagegen werden geprüft: Ein Terminal-Theme muss
+ * nur wissen, wie „grün" aussieht — ein Editor muss wissen, ob die
+ * Statusleiste auf ihrem eigenen Untergrund noch lesbar ist und ob ein
+ * Dialog über dem Text steht oder in ihm versinkt.
  */
 export function omarchyPalette(c: OmarchyColors, base: Palette): Palette {
   const bg = c.background ?? base.bg;
   const dark = c.mode === "dark";
-  // Zwei zusätzliche Flächenfarben für Statusleiste/Dialoge — welche davon
-  // heller oder dunkler als `bg` ausfällt, ist je Theme unterschiedlich
-  // gepflegt; wichtig ist nur, dass sie sich von `bg` und voneinander
-  // unterscheiden.
-  const surface = (dark ? c.lighterBackground : c.darkBackground) ?? base.surface;
-  const surfaceRaised = c.darkerBackground ?? surface;
+  const fg = c.foreground ?? base.text;
+
+  // Drei Ebenen, die in dieselbe Richtung führen: Text < Statusleiste <
+  // Dialog. Omarchys eigene Werte kommen zum Zug, wenn sie in diese
+  // Richtung zeigen — sonst rechnet Rui die Stufe selbst.
+  //
+  // Vorher wurde `darker_background` für die Dialoge genommen. Bei Tokyo
+  // Night ist das `#0e0e14`: dunkler als der Editor, obwohl der Dialog
+  // über ihm liegt. Einstellungen und Schnellöffnen fielen damit in ein
+  // Loch statt sich abzuheben.
+  const hinted = dark ? c.lighterBackground : c.darkBackground;
+  const surface = hinted && lifted(hinted, bg, dark) ? hinted : lift(bg, dark ? 0.07 : 0.05, dark);
+  const surfaceRaised = dark ? lift(surface, 0.06, true) : mix(bg, "#ffffff", 0.75);
+
   const accent = c.accent ?? base.accent;
+
+  // `dark_foreground` ist die Kommentarfarbe des Themes — im Code richtig
+  // gedimmt, für Beschriftungen der Oberfläche aber oft zu leise. Sie
+  // gilt hier deshalb nur so weit, wie sie auf der Statusleiste lesbar
+  // bleibt.
+  const dimmed = c.darkForeground ?? base.muted;
+  const muted = ensureContrast(dimmed, surface, 4.5, fg);
 
   return {
     bg,
     surface,
     surfaceRaised,
-    border: c.muted ?? c.darkForeground ?? base.border,
-    text: c.foreground ?? base.text,
-    muted: c.darkForeground ?? base.muted,
+    // Der Rand darf leise sein, muss aber sichtbar bleiben — er ist das
+    // Einzige, was einen Dialog gegen den Text abgrenzt.
+    border: ensureContrast(c.muted ?? dimmed, surfaceRaised, 1.6, fg),
+    text: fg,
+    muted,
     accent,
     accentText: contrastText(accent, "#111318", "#ffffff"),
-    selection: c.selection ?? base.selection,
+    // Eine Auswahl, die man nicht sieht, ist keine. Manche Themes halten
+    // ihre Selektionsfarbe so dicht am Hintergrund, dass im Editor nichts
+    // mehr davon übrig bleibt.
+    selection: ensureContrast(c.selection ?? base.selection, bg, 1.5, fg),
     activeLine: surface,
-    gutter: c.darkForeground ?? base.gutter,
-    gutterActive: c.foreground ?? base.gutterActive,
+    gutter: ensureContrast(dimmed, bg, 3, fg),
+    gutterActive: fg,
     danger: c.red ?? base.danger,
 
     keyword: c.magenta ?? base.keyword,
     string: c.green ?? base.string,
     number: c.orange ?? c.yellow ?? base.number,
-    comment: c.darkForeground ?? base.comment,
+    comment: dimmed,
     func: c.blue ?? base.func,
     // Cyan ist in Terminal-Paletten die Farbe, die Rui sonst nur für Links
     // braucht — hier trägt sie mehr, weil Cmdlets in einem PowerShell-Script
     // der häufigste Token überhaupt sind.
     builtin: c.cyan ?? base.builtin,
     operator: c.brown ?? c.magenta ?? base.operator,
-    meta: c.darkForeground ?? base.meta,
+    meta: dimmed,
     type: c.yellow ?? base.type,
-    variable: c.foreground ?? base.variable,
+    variable: fg,
     heading: c.blue ?? base.heading,
     link: c.cyan ?? base.link,
     invalid: c.red ?? base.invalid,
   };
+}
+
+/**
+ * Liegt `candidate` gegenüber `bg` in der Richtung, die „höher" bedeutet —
+ * heller im dunklen Theme, dunkler im hellen? Und weit genug entfernt, um
+ * als eigene Fläche durchzugehen?
+ */
+function lifted(candidate: string, bg: string, dark: boolean): boolean {
+  const diff = luminance(candidate) - luminance(bg);
+  const enough = Math.abs(diff) > 0.004;
+  return enough && (dark ? diff > 0 : diff < 0);
 }
 
 /** Schreibt die Palette als CSS-Variablen auf `<html>`. */

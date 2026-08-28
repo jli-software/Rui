@@ -60,6 +60,9 @@ export class StatusBar {
   /** Angefangene Vim-Eingabe, etwa `2d` — beim Lernen die halbe Miete. */
   private readonly pending: HTMLSpanElement;
   private readonly settings: HTMLButtonElement;
+  /** Kurzmeldung nach einer Aktion, etwa `"notiz.md" geschrieben`. */
+  private readonly message: HTMLSpanElement;
+  private messageTimer: number | undefined;
 
   constructor(root: HTMLElement, actions: StatusActions) {
     root.innerHTML = `
@@ -67,6 +70,7 @@ export class StatusBar {
         <span class="status-vim" hidden></span>
         <span class="status-pending"></span>
         <span class="status-flags"></span>
+        <span class="status-message"></span>
       </div>
       <div class="status-right">
         <span class="status-selection"></span>
@@ -91,6 +95,7 @@ export class StatusBar {
     this.vim = root.querySelector(".status-vim")!;
     this.pending = root.querySelector(".status-pending")!;
     this.settings = root.querySelector(".status-settings")!;
+    this.message = root.querySelector(".status-message")!;
 
     this.position.addEventListener("click", actions.onPosition);
     this.language.addEventListener("click", actions.onLanguage);
@@ -129,6 +134,22 @@ export class StatusBar {
     if (modified) marks.push("Geändert");
     this.flags.textContent = marks.join(" · ");
     this.flags.classList.toggle("is-modified", modified);
+  }
+
+  /**
+   * Eine kurze Rückmeldung, die von selbst wieder verschwindet.
+   *
+   * Vim schreibt nach `:w` `"datei.md" 12L, 340B written` in die
+   * Kommandozeile. Rui hatte darauf gar keine Antwort: Ob `:w` etwas
+   * getan hat, liess sich nur daran ablesen, dass „Geändert" verschwand —
+   * und beim Speichern einer unveränderten Datei nicht einmal daran.
+   */
+  flash(text: string) {
+    window.clearTimeout(this.messageTimer);
+    this.message.textContent = text;
+    this.messageTimer = window.setTimeout(() => {
+      this.message.textContent = "";
+    }, 2500);
   }
 
   /**

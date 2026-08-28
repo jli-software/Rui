@@ -180,6 +180,23 @@ body[data-decoration="custom"] #titlebar {
   font-family: var(--ui-font);
 }
 
+/*
+ * Rückmeldung nach dem Speichern. Sie steht in der Akzentfarbe und
+ * verschwindet nach zwei Sekunden von selbst — was Vim in seiner
+ * Kommandozeile macht, nur an der Stelle, an der Rui ohnehin über die
+ * Datei berichtet.
+ */
+.status-message {
+  padding-left: 8px;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-message:empty {
+  padding-left: 0;
+}
+
 .status-selection {
   padding: 0 6px;
 }

@@ -147,7 +147,7 @@ function clipboardRegister() {
 }
 
 /**
- * Der Blockcursor in Ruis Farben.
+ * Der Blockcursor und die Ex-Kommandozeile in Ruis Farben.
  *
  * Das Paket bringt einen mit — in einem kräftigen Rosa, das mit der
  * Sage-Palette nichts zu tun hat, und es hängt ihn mit `Prec.highest`
@@ -171,15 +171,41 @@ const cursorTheme = Prec.highest(
     },
     // Die Kommandozeile für `:` und `/` erbt die eingestellte
     // Editorschrift statt der fest verdrahteten `monospace` des Pakets.
-    ".cm-vim-panel": { fontFamily: "inherit", padding: "2px 10px" },
+    ".cm-vim-panel": {
+      fontFamily: "inherit",
+      padding: "3px 10px",
+      backgroundColor: "var(--surface)",
+      color: "var(--text)",
+    },
+    // Das Eingabefeld hat vom Paket nur `background: inherit` mitbekommen.
+    // Textfarbe und Schrift erbt ein `<input>` aber nicht — beides kommt
+    // vom Stylesheet des Browsers, und das rechnet mit einem hellen
+    // Formular. In einem dunklen Theme stand die getippte Zeile dadurch
+    // fast schwarz auf dunkelgrau.
+    ".cm-vim-panel input": {
+      color: "var(--text) !important",
+      caretColor: "var(--accent)",
+      font: "inherit !important",
+      width: "100%",
+    },
+    // Vims Meldungen — „Invalid command", „Pattern not found" — kommen mit
+    // einem festen `color: red` am Element. Das ist in jedem Theme dieselbe
+    // Signalfarbe und in keinem die richtige.
+    "div.cm-vim-message": { color: "var(--danger) !important" },
   }),
 );
 
-/** Was das Vim-Paket einem Ex-Befehl über die eingetippte Zeile mitgibt. */
+/**
+ * Was das Vim-Paket einem Ex-Befehl über die eingetippte Zeile mitgibt.
+ *
+ * `argString` ist der Teil **hinter** dem Befehlsnamen und fehlt, wenn
+ * keiner dasteht. `input` dagegen ist die ganze getippte Zeile — bei `:w`
+ * also `"w"`. Wer `input` als Ersatz für ein fehlendes `argString` nimmt,
+ * hält den Befehlsnamen für einen Dateinamen; genau das hat Rui bis 0.3.5
+ * getan und `:w` eine Datei namens `w` schreiben lassen.
+ */
 interface ExParams {
   argString?: string;
-  input?: string;
-  args?: string[];
 }
 
 /**
@@ -194,8 +220,7 @@ function forced(params: ExParams): boolean {
 }
 
 function argString(params: ExParams): string {
-  const raw = params.argString ?? params.args?.join(" ") ?? params.input ?? "";
-  return raw.trim();
+  return (params.argString ?? "").trim();
 }
 
 /**
