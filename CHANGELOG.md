@@ -7,6 +7,7 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Geplant für 0.3.x
+- Kürzel in den Einstellungen nicht nur zeigen, sondern umstellen können
 - Vim: `:set number`, `:set wrap` und Verwandtschaft auf Ruis Einstellungen
 - Linux: `rui <datei>` und Dateiverknüpfungen über die Paketierung
 
@@ -19,6 +20,19 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.3.2] — 2026-08-28
+
+### Geändert
+- **README auf das Produkt zugeschnitten und um gut die Hälfte gekürzt.**
+  Es beschrieb ausführlich, *wie* Dinge gebaut sind — Namensgebung von
+  Notizen, Icon-Erzeugung, Architekturbegründungen. Das gehört in die
+  Projektnotizen, nicht ins Schaufenster. Jetzt steht dort in kurzen
+  Fakten, was drin ist, wofür Rui gedacht ist (Windows, Notepad++-Erbe,
+  Snippets aus KI-Workflows lesen und anpassen) und dass die
+  Vim-Steuerung abschaltbar und zum Lernen der Griffe gedacht ist.
+- Ein Abschnitt **Not in it** sagt geradeheraus, was Rui nicht kann.
+- Platzhalter für einen Screenshot unter `assets/screenshots/rui.png`.
 
 ## [0.3.1] — 2026-08-28
 
@@ -398,7 +412,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.1...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/vikingjunior12/Rui/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/vikingjunior12/Rui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/vikingjunior12/Rui/compare/v0.2.6...v0.3.0
 [0.2.6]: https://github.com/vikingjunior12/Rui/compare/v0.2.5...v0.2.6
