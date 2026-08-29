@@ -106,9 +106,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Nicht nach `assets/` — so heisst im Repository schon der Ordner mit
+      # Logo und Screenshots, und der landete dann mit im Release.
       - uses: actions/download-artifact@v5
         with:
-          path: assets
+          path: paket
           merge-multiple: true
 
       - name: Release zusammenstellen
@@ -128,10 +130,15 @@ jobs:
             exit 1
           fi
 
+          # Lieber hier hart abbrechen als ein halbes Release veröffentlichen.
+          for datei in rui.exe rui-setup.exe rui-setup.msi rui-linux-x86_64.tar.gz; do
+            [ -f "paket/$datei" ] || { echo "$datei fehlt im Paket" >&2; exit 1; }
+          done
+
           # Getrennt schreiben und erst dann hineinlegen, damit die Liste
           # sich nicht selbst enthält.
-          (cd assets && sha256sum *) > SHA256SUMS.txt
-          mv SHA256SUMS.txt assets/
+          (cd paket && sha256sum *) > SHA256SUMS.txt
+          mv SHA256SUMS.txt paket/
 
           # Der Abschnitt dieser Version aus dem Changelog, ohne die
           # Vergleichslinks am Dateiende.
@@ -171,4 +178,4 @@ jobs:
           gh release create "$tag" \
             --title "$titel" \
             --notes-file notiz.md \
-            assets/*
+            paket/*

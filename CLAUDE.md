@@ -66,8 +66,16 @@ gh run watch          # oder: gh run list --limit 1
 
 Wer vor dem Tag sichergehen will, startet denselben Workflow von Hand
 (`gh workflow run Release`) — der baut alles, veröffentlicht aber nichts.
-Schlägt der Lauf fehl, ist der Tag schon draussen: korrigieren, Version
-hochzählen, neu taggen — einen bestehenden Tag nicht verschieben.
+Schlägt der Lauf fehl, ist der Tag schon draussen. Hat er noch kein Release
+erzeugt, darf er weg und nach der Korrektur neu gesetzt werden:
+
+```bash
+git push --delete origin v0.3.7 && git tag -d v0.3.7
+```
+
+Hängt dagegen schon ein Release daran, bleibt der Tag stehen — dann wird die
+Version hochgezählt und neu getaggt. Ein veröffentlichter Tag zeigt immer auf
+denselben Stand, sonst hat jemand anderes eine andere 0.3.7 als du.
 
 ## Sprachen im Projekt
 
