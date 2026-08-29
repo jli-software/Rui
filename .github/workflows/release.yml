@@ -23,11 +23,11 @@ jobs:
     # dessen glibc und startet auf älteren Distributionen nicht mehr.
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
@@ -58,7 +58,7 @@ jobs:
           ./scripts/build-release.sh
           ./scripts/package-linux.sh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: linux
           path: release/rui-linux-x86_64.tar.gz
@@ -67,11 +67,11 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
@@ -86,7 +86,7 @@ jobs:
         shell: pwsh
         run: ./scripts/build-release.ps1
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows
           path: |
@@ -102,11 +102,11 @@ jobs:
     steps:
       # Voller Klon: die Release-Notiz kommt aus CHANGELOG.md, der Titel aus
       # der Beschriftung des Tags.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: assets
           merge-multiple: true
