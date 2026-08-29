@@ -20,6 +20,43 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.3.7] — 2026-08-29
+
+### Hinzugefügt
+- **Installation unter Linux mit einer Zeile.** Wer Rui nur benutzen will,
+  braucht das Repository nicht mehr:
+
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/vikingjunior12/Rui/main/install.sh | bash
+  ```
+
+  Das Script holt das neueste Release, entpackt es und hängt Rui an denselben
+  Stellen ein wie bisher — Binary, Symlink für das Terminal, Starter, Icons,
+  alles unter dem Benutzerprofil, ohne Root. Es zieht sich selbst mit nach
+  `~/.local/share/rui/`, sodass `~/.local/share/rui/install.sh --uninstall`
+  auch ohne Netz und ohne Repository wieder aufräumt.
+- **Die Releases baut jetzt GitHub Actions.** Ein Tag `v*` löst Windows- und
+  Linux-Build nebeneinander aus, hängt beide ans Release und schreibt die
+  Prüfsummen dazu. Die Release-Notiz kommt aus diesem Changelog, der Titel aus
+  der Beschriftung des Tags. `workflow_dispatch` baut dasselbe, ohne etwas zu
+  veröffentlichen — der Trockenlauf vor dem Tag.
+- **`scripts/package-linux.sh`** schnürt aus dem Linux-Build das Archiv
+  `rui-linux-x86_64.tar.gz` mit Binary, Icons und Installer. Eine nackte
+  Binary reicht zur Installation nicht: ohne Icons steht im Anwendungsstarter
+  ein graues Rechteck.
+
+### Geändert
+- **`scripts/install-linux.sh` ist nur noch der Bau-Vorspann.** Wohin Rui
+  gehört, weiss ab jetzt allein `install.sh`; das Script baut und übergibt.
+  Vorher stand derselbe Ablauf zweimal da und wäre beim nächsten Pfadwechsel
+  auseinandergelaufen.
+
+### Behoben
+- **Windows fehlte in den Releases 0.3.3 bis 0.3.6.** Weil beide Plattformen
+  von Hand gebaut wurden, hing an einem Release nur, was gerade auf der
+  Maschine entstand, auf der getaggt wurde — meist Linux. Das kann jetzt nicht
+  mehr passieren: ohne beide Builds entsteht kein Release.
+
 ## [0.3.6] — 2026-08-28
 
 ### Behoben
@@ -540,7 +577,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.6...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.7...HEAD
+[0.3.7]: https://github.com/vikingjunior12/Rui/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/vikingjunior12/Rui/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/vikingjunior12/Rui/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/vikingjunior12/Rui/compare/v0.3.3...v0.3.4

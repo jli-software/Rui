@@ -1,7 +1,7 @@
 # Rui
 
-A small, fast text editor for Windows — the kind of thing Notepad++ was, with
-Vim keybindings you can switch on or leave off.
+A small, fast text editor for Windows and Linux — the kind of thing Notepad++
+was, with Vim keybindings you can switch on or leave off.
 
 Built because Windows Notepad stopped being enough and there is not much
 between it and a full IDE. Rui opens a `.ps1`, a log or a diff instantly,
@@ -16,19 +16,41 @@ the case this was built for.
 
 <!-- Screenshot: rui.png — dark theme, a .ps1 open, status bar visible. -->
 
-## Download
+## Install
 
-Latest build: [Releases](https://github.com/vikingjunior12/Rui/releases).
+**Linux** — one line, no repository, no root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vikingjunior12/Rui/main/install.sh | bash
+```
+
+Fetches the latest release and puts the binary in `~/.local/share/rui`, a
+symlink in `~/.local/bin` so `rui file.txt` works in any terminal, icons in
+`~/.local/share/icons`, and a `rui.desktop` entry so Rui appears in the
+application launcher and under *Open with*. Everything stays inside your home
+directory. To remove it again: `~/.local/share/rui/install.sh --uninstall`.
+
+Rui does not make itself the default editor — that stays your call:
+
+```bash
+xdg-mime default rui.desktop text/plain
+```
+
+**Windows** — from [Releases](https://github.com/vikingjunior12/Rui/releases):
 
 | File | What it is |
 |---|---|
-| `rui.exe` | portable, runs without installing |
 | `rui-setup.exe` | NSIS installer (per-user) |
+| `rui.exe` | portable, runs without installing |
 | `rui-setup.msi` | MSI, for Intune/GPO |
+| `rui-linux-x86_64.tar.gz` | Linux build, what the line above downloads |
 | `SHA256SUMS.txt` | checksums |
 
 Not code-signed, so SmartScreen warns on first launch (*More info* → *Run
-anyway*). Linux builds from source, see below; macOS is untested.
+anyway*). macOS is untested.
+
+Every release is built by GitHub Actions on both platforms from the tagged
+commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ## What's in it
 
@@ -136,29 +158,24 @@ Build through the Tauri CLI, not `cargo build --release`. The Cargo feature
 its frontend from the embedded `dist/` or from the dev server on
 `localhost:1420`. A binary built without it starts on an error page.
 
-### Install on Linux
+### Install your own build on Linux
 
 ```bash
 ./scripts/install-linux.sh              # build if needed, then install
 ./scripts/install-linux.sh --uninstall  # remove it again
+./scripts/package-linux.sh              # release/rui-linux-x86_64.tar.gz
 ```
 
-Puts the binary in `~/.local/share/rui`, a symlink in `~/.local/bin` so
-`rui file.txt` works in a terminal, icons in `~/.local/share/icons`, and a
-`rui.desktop` entry so Rui shows up in the application launcher and under
-*Open with*. No root, nothing outside your home directory. It does not make
-itself the default editor — that stays your call:
-
-```bash
-xdg-mime default rui.desktop text/plain
-```
-
-The same registration is available from Rui's settings under *Linux*, for
-when you run the binary from wherever you downloaded it.
+The first one builds and then hands over to the same `install.sh` the one-line
+install uses, so a build from source lands in exactly the same places. The same
+registration is also available from Rui's settings under *Linux*, for when you
+run the binary from wherever you downloaded it.
 
 Windows is built natively, not cross-compiled — WebView2 and the MSVC linker
 make that unreliable from the outside. Needs the MSVC build tools, the
-`x86_64-pc-windows-msvc` target and Node.
+`x86_64-pc-windows-msvc` target and Node. For releases that is CI's job; the
+Linux job runs on Ubuntu 22.04 so the binary does not demand a newer glibc
+than the distribution it lands on.
 
 Settings live in `%APPDATA%/ch.gaiching.rui/settings.json`; defaults are in
 `settings.rs`, not in the file. The settings dialog has a button that opens

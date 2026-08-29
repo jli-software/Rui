@@ -42,14 +42,32 @@ Ablauf, jedes Mal vollständig:
 2. `CHANGELOG.md` ergänzen — unter `## [Unveröffentlicht]`, oder als neuer
    Versionsblock, wenn die Änderung damit abgeschlossen ist
 3. Committen (Commit-Message auf Deutsch, erklärt das *Warum*, nicht das Was)
-4. Tag `v<version>` setzen — jede Version bekommt einen, damit die
-   Vergleichslinks im Changelog auflösen
+4. Tag `v<version>` setzen — **annotiert**, denn die erste Zeile der
+   Beschriftung wird der Titel des Releases:
+
+   ```bash
+   git tag -a v0.3.7 -m "Rui 0.3.7 — Releases kommen jetzt aus der CI"
+   ```
+
 5. **`git push --follow-tags`** — nicht liegen lassen. Das Repo ist
    öffentlich: <https://github.com/vikingjunior12/Rui>
 
-6. Für **jede Version** einen GitHub Release mit den gebauten Binaries
-   erstellen — ausdrücklich auch für Patch-Versionen. Jonas will jeden
-   getaggten Stand direkt von der Release-Seite testen können.
+Den Rest macht `.github/workflows/release.yml`: Der Tag löst Windows- und
+Linux-Build aus, hängt beide samt Prüfsummen ans Release und nimmt die Notiz
+aus dem Changelog-Abschnitt dieser Version. Also **jede Version bekommt einen
+Tag**, ausdrücklich auch Patch-Versionen — ohne Tag gibt es kein Release, und
+Jonas will jeden Stand von der Release-Seite testen können.
+
+Nach dem Push kurz nachsehen, ob der Lauf grün wird:
+
+```bash
+gh run watch          # oder: gh run list --limit 1
+```
+
+Wer vor dem Tag sichergehen will, startet denselben Workflow von Hand
+(`gh workflow run Release`) — der baut alles, veröffentlicht aber nichts.
+Schlägt der Lauf fehl, ist der Tag schon draussen: korrigieren, Version
+hochzählen, neu taggen — einen bestehenden Tag nicht verschieben.
 
 ## Sprachen im Projekt
 
@@ -85,4 +103,12 @@ npm run tauri dev              # App starten
 cd src-tauri && cargo test     # Tests
 .\scripts\build-release.ps1    # Windows: Binary + Installer nach release/
 ./scripts/build-release.sh     # Linux: release/rui-linux
+./scripts/package-linux.sh     # daraus release/rui-linux-x86_64.tar.gz
+./scripts/install-linux.sh     # bauen und lokal installieren
 ```
+
+Wohin Rui unter Linux gehört, steht **nur** in `install.sh` im Wurzelordner —
+dasselbe Script liegt im Tarball und hinter dem curl-Einzeiler. Ändert sich
+ein Pfad, ändert er sich dort, und `integration.rs::desktop_entry()` muss
+dieselbe `.desktop`-Datei schreiben, sonst meldet Rui in den Einstellungen
+"nicht eingehängt".
