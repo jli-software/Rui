@@ -161,6 +161,17 @@ jobs:
           fi
           [ -n "$titel" ] || titel="Rui $version"
 
+          # Die Nummer gehört in den Titel, nicht nur an den Tag daneben: in
+          # der Release-Liste steht sonst eine Überschrift ohne Bezug, und
+          # welche Fassung dahinter liegt, sieht man erst beim Aufklappen — so
+          # geschehen in 0.3.9. Ergänzt wird still statt abzubrechen: ein
+          # fertiger Build aus zwei Plattformen darf nicht an einer
+          # Beschriftung scheitern, die sich hier korrigieren lässt.
+          case "$titel" in
+            *"$version"*) ;;
+            *) titel="Rui $version — $titel" ;;
+          esac
+
           if [ -n "$text" ]; then
             printf '%s\n\n' "$text" > notiz.md
           else

@@ -20,6 +20,17 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.3.10] — 2026-08-29
+
+### Geändert
+- **Im Titel eines Releases steht immer die Versionsnummer.** 0.3.9 hiess auf
+  der Release-Seite nur „English release notes" — welche Fassung dahinter
+  liegt, stand allein am Tag daneben. Der Titel folgt jetzt dem Muster
+  `Rui <version> — <Name der Änderung>`; ein reiner Fehlerbehebungs-Release
+  heisst schlicht `Rui <version> — Hotfix`, ein grösserer bekommt einen
+  eigenen Namen. Fehlt die Nummer in der Beschriftung des Tags, stellt der
+  Workflow sie voran, statt den fertigen Build abzubrechen.
+
 ## [0.3.9] — 2026-08-29
 
 ### Geändert
@@ -602,7 +613,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.9...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.10...HEAD
+[0.3.10]: https://github.com/vikingjunior12/Rui/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/vikingjunior12/Rui/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/vikingjunior12/Rui/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/vikingjunior12/Rui/compare/v0.3.6...v0.3.7
