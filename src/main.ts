@@ -3,10 +3,11 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { open as openDialog, save as saveDialog, ask, message } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { openSearchPanel } from "@codemirror/search";
 import { undo, redo } from "@codemirror/commands";
 
+import { AboutDialog } from "./about";
 import { RuiEditor } from "./editor";
 import { refresh as readClipboard, write as writeClipboard } from "./clipboard";
 import { CommandPalette, promptInput, type Command } from "./palette";
@@ -56,6 +57,7 @@ class App {
   private quickOpen!: QuickOpen;
   private settingsDialog!: SettingsDialog;
   private shortcuts!: ShortcutsOverlay;
+  private about!: AboutDialog;
   private titlebar!: TitleBar;
   private omarchyAvailable = false;
 
@@ -120,6 +122,10 @@ class App {
       vimMode: () => this.settings.vimMode,
       onClose: backToText,
     });
+    this.about = new AboutDialog({
+      flash: (text) => this.status.flash(text),
+      onClose: backToText,
+    });
     this.quickOpen = new QuickOpen({
       load: () => {
         const folders = this.searchFolders();
@@ -143,6 +149,8 @@ class App {
       onLineEnding: () => this.pickLineEnding(),
       onSettings: () => this.settingsDialog.open(),
       onShortcuts: () => this.shortcuts.toggle(),
+      onAbout: () => this.about.toggle(),
+      onFile: () => void this.copyPath(),
     });
     this.tabBar = new TabBar(document.querySelector<HTMLElement>("#tabs")!, {
       onSelect: (id) => void this.activate(this.indexOf(id)),
@@ -1242,8 +1250,43 @@ class App {
       .join("\n");
     // Ohne Auswahl gibt es nichts zu kopieren. Die aktuelle Zeile
     // stattdessen zu nehmen wäre eine Vermutung, und eine überschriebene
-    // Zwischenablage lässt sich nicht zurückholen.
-    if (text) void writeClipboard(text);
+    // Zwischenablage lässt sich nicht zurückholen. Gesagt werden muss es
+    // trotzdem: Ein Kürzel, das schweigt, sieht aus wie eines, das nicht
+    // ankommt.
+    if (!text) {
+      this.status.flash("Nichts ausgewählt");
+      return;
+    }
+    void writeClipboard(text);
+    this.status.flash(`${countLines(text)} kopiert`);
+  }
+
+  /**
+   * Die ganze Datei in die Zwischenablage — Vims `:%y+` ohne Vim.
+   *
+   * Rui wird viel als Durchreiche benutzt: Text hier zurechtlegen, dann
+   * woanders einfügen. Bis 0.5.0 hiess das erst alles markieren und dann
+   * kopieren; über die Auswahl zu gehen ist bei ein paar hundert Zeilen
+   * ein Umweg, den niemand braucht.
+   */
+  private copyAll() {
+    const text = this.editor.content;
+    if (!text) {
+      this.status.flash("Die Datei ist leer");
+      return;
+    }
+    void writeClipboard(text);
+    this.status.flash(`Alles kopiert · ${countLines(text)}`);
+  }
+
+  /** Der volle Pfad der offenen Datei in die Zwischenablage. */
+  private copyPath() {
+    if (!this.buffer.path) {
+      this.status.flash("Noch nicht gespeichert");
+      return;
+    }
+    void writeClipboard(this.buffer.path);
+    this.status.flash("Pfad kopiert");
   }
 
   private async pasteFromClipboard() {
@@ -1262,11 +1305,17 @@ class App {
 
   // ---- Befehle ----------------------------------------------------------
 
-  private toggle(key: keyof Settings, title: string, group = "Ansicht"): Command {
+  private toggle(
+    key: keyof Settings,
+    title: string,
+    group = "Ansicht",
+    shortcut?: string,
+  ): Command {
     return {
       id: `toggle.${key}`,
       group,
       title,
+      shortcut,
       state: () => (this.settings[key] ? "an" : "aus"),
       run: () => this.updateSettings({ ...this.settings, [key]: !this.settings[key] }),
     };
@@ -1337,17 +1386,19 @@ class App {
         id: "file.reveal",
         group: "Datei",
         title: "Im Dateimanager zeigen",
+        // `revealItemInDir` statt `openPath` auf den Elternordner: Es
+        // markiert die Datei gleich mit — und `opener:default` deckt nur
+        // dieses, `open-path` müsste eigens freigeschaltet werden.
         run: async () => {
-          if (this.buffer.path) await openPath(this.buffer.path.replace(/[\\/][^\\/]+$/, ""));
+          if (this.buffer.path) await revealItemInDir(this.buffer.path);
+          else this.status.flash("Noch nicht gespeichert");
         },
       },
       {
         id: "file.copyPath",
         group: "Datei",
         title: "Pfad kopieren",
-        run: async () => {
-          if (this.buffer.path) await navigator.clipboard.writeText(this.buffer.path);
-        },
+        run: () => this.copyPath(),
       },
 
       {
@@ -1365,6 +1416,13 @@ class App {
         title: "In die Zwischenablage kopieren",
         shortcut: "Strg+Umschalt+C",
         run: () => this.copyToClipboard(),
+      },
+      {
+        id: "edit.copyAll",
+        group: "Bearbeiten",
+        title: "Ganze Datei in die Zwischenablage",
+        shortcut: "Strg+Umschalt+A",
+        run: () => this.copyAll(),
       },
       {
         id: "edit.paste",
@@ -1399,7 +1457,7 @@ class App {
         },
       },
 
-      this.toggle("wordWrap", "Zeilenumbruch"),
+      this.toggle("wordWrap", "Zeilenumbruch", "Ansicht", "Alt+Z"),
       this.toggle("lineNumbers", "Zeilennummern"),
       this.toggle("relativeLineNumbers", "Relative Zeilennummern"),
       this.toggle("showWhitespace", "Leerzeichen sichtbar"),
@@ -1464,7 +1522,26 @@ class App {
         shortcut: "Strg+I",
         run: () => this.settingsDialog.open(),
       },
+      {
+        id: "app.about",
+        group: "Rui",
+        title: "Über Rui…",
+        run: () => this.about.open(),
+      },
     ];
+  }
+
+  /**
+   * Zeilenumbruch an oder aus, mit Rückmeldung.
+   *
+   * Ohne die Meldung ist der Griff bei einer Datei ohne lange Zeilen
+   * unsichtbar: Es ändert sich nichts am Bild, und man drückt ihn ein
+   * zweites Mal.
+   */
+  private async toggleWordWrap() {
+    const wordWrap = !this.settings.wordWrap;
+    await this.updateSettings({ ...this.settings, wordWrap });
+    this.status.flash(wordWrap ? "Zeilenumbruch an" : "Zeilenumbruch aus");
   }
 
   private zoom(delta: number) {
@@ -1479,6 +1556,26 @@ class App {
       "keydown",
       (e) => {
         const mod = e.ctrlKey || e.metaKey;
+        const overlayOpen = this.shortcuts.isOpen || this.quickOpen.isOpen || this.about.isOpen;
+
+        // Alt+Z schaltet den Zeilenumbruch — wie in VS Code, und der
+        // einzige Griff ohne Strg. Er steht hier vorn, weil er ohne
+        // Modifikator-Abfrage auskommen muss: Umbruch ist die Einstellung,
+        // die man beim Lesen einer fremden Logdatei umlegt und beim
+        // Schreiben wieder zurück, und dafür ist ein Weg über die
+        // Einstellungen zu weit.
+        if (e.altKey && !mod && !e.shiftKey && e.key.toLowerCase() === "z") {
+          if (overlayOpen || this.palette.isOpen) return;
+          e.preventDefault();
+          // `stopPropagation` ist hier nicht optional: Ohne das erreicht
+          // das `z` zusätzlich die Vim-Steuerung, die es als angefangenen
+          // `z`-Befehl stehen lässt — der nächste Tastendruck rollt dann
+          // den Bildschirm, statt zu tippen.
+          e.stopPropagation();
+          void this.toggleWordWrap();
+          return;
+        }
+
         if (!mod) return;
 
         // Was ein Overlay gerade selbst braucht, bleibt dort. Strg+K
@@ -1490,7 +1587,7 @@ class App {
           this.shortcuts.close();
           return;
         }
-        if (this.quickOpen.isOpen) return;
+        if (this.quickOpen.isOpen || this.about.isOpen) return;
         if (this.palette.isOpen && e.key !== ",") return;
 
         const key = e.key.toLowerCase();
@@ -1507,6 +1604,7 @@ class App {
         if (e.shiftKey && key === "p") return run(() => this.palette.open());
         if (e.shiftKey && key === "o") return run(() => this.openFileDialog());
         if (e.shiftKey && key === "s") return run(() => this.saveAs());
+        if (e.shiftKey && key === "a") return run(() => this.copyAll());
         if (e.shiftKey && key === "c") return run(() => this.copyToClipboard());
         if (e.shiftKey && key === "v") return run(() => this.pasteFromClipboard());
         if (e.shiftKey) return;
@@ -1625,6 +1723,18 @@ function samePath(a: string | null, b: string): boolean {
 /** Nur der Dateiname, für Rückfragen, in denen der ganze Pfad stört. */
 function shortName(path: string): string {
   return path.split(/[\/]/).pop() ?? path;
+}
+
+/**
+ * „12 Zeilen" oder „1 Zeile" — die Rückmeldung nach dem Kopieren.
+ *
+ * Vim meldet nach `:%y+` `12 lines yanked`. Eine Zahl sagt mehr als ein
+ * „kopiert": Sie beantwortet die Frage, ob wirklich das Ganze erwischt
+ * wurde oder nur der Rest einer Auswahl.
+ */
+function countLines(text: string): string {
+  const lines = text.split("\n").length;
+  return lines === 1 ? "1 Zeile" : `${lines} Zeilen`;
 }
 
 /** Der Ordner, in dem eine Datei liegt — `null` für einen leeren Puffer. */

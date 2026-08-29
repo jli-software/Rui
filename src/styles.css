@@ -254,8 +254,56 @@ body[data-decoration="custom"] #titlebar {
   text-overflow: ellipsis;
 }
 
+/*
+ * Wer nachgibt, wenn die Leiste zu eng wird.
+ *
+ * In einem halbbreiten Fenster auf einem kleinen Laptop passt nicht alles
+ * nebeneinander, und Flexbox lässt in seiner Vorgabe alle gleichmässig
+ * nachgeben — das Ergebnis waren lauter halbe Wörter. Die Rangfolge steht
+ * deshalb ausdrücklich da: Zuerst schrumpft die Zeilenzahl, dann die
+ * Kurzmeldung, die ohnehin nach zwei Sekunden verschwindet. Dateiname,
+ * Marken und die Werkzeuge rechts geben nie nach — die ersten beiden sind
+ * Auskunft, die man halb abgeschnitten falsch liest, und ein
+ * abgeschnittenes Zahnrad wäre ein verlorener Zugang zu allem, was ohne
+ * Tastatur nur dort erreichbar ist.
+ */
+.status-flags {
+  flex-shrink: 0;
+}
+
 .status-flags.is-modified {
   color: var(--accent);
+}
+
+/*
+ * Der Dateiname in der Statusleiste.
+ *
+ * Er steht in der Textfarbe, während alles andere rechts gedämpft ist —
+ * das ist die Rangfolge, die man beim Blick nach unten braucht: erst
+ * welche Datei, dann welche Zeile. Der Punkt für „geändert" sitzt davor
+ * und nicht dahinter, damit der Name beim Umschalten nicht wandert.
+ *
+ * `min-width: 0` und die Ellipse sind kein Schönheitsfehlerschutz,
+ * sondern Voraussetzung: Ohne sie drückt ein langer Name die Werkzeuge
+ * rechts aus dem Fenster.
+ */
+.status-file {
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: 24ch;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+}
+
+.status-file.is-modified {
+  color: var(--accent);
+}
+
+/* Ein Puffer ohne Datei hat keinen Namen, nur einen Platzhalter. */
+.status-file.is-unnamed {
+  color: var(--muted);
+  font-style: italic;
 }
 
 /*
@@ -279,6 +327,9 @@ body[data-decoration="custom"] #titlebar {
  * aus, Rot überschreibt.
  */
 .status-vim {
+  /* Die Plakette überlebt auch ein enges Fenster: In welchem Modus man
+     tippt, ist die eine Frage, die man nicht raten will. */
+  flex-shrink: 0;
   padding: 1px 6px;
   border: 1px solid var(--accent);
   border-radius: 4px;
@@ -309,6 +360,7 @@ body[data-decoration="custom"] #titlebar {
 
 /* Angefangene Eingabe wie `2d` — im Text-Font, weil es Tasten sind. */
 .status-pending {
+  flex-shrink: 0;
   min-width: 2ch;
   padding-left: 6px;
   color: var(--muted);
@@ -333,8 +385,19 @@ body[data-decoration="custom"] #titlebar {
 }
 
 .status-selection {
+  min-width: 0;
   padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+/*
+ * Der Dateiname gibt als Einziger rechts nicht nach. Er ist die Auskunft,
+ * für die die Leiste da ist; die Zeilenzahl daneben ist der Posten, den
+ * man in einem halbbreiten Fenster am ehesten entbehrt. Seine eigene
+ * Grenze bleibt `max-width` — ein sehr langer Name kürzt sich selbst,
+ * statt die Leiste zu sprengen.
+ */
 
 .status-btn {
   padding: 3px 8px;
@@ -361,6 +424,7 @@ body[data-decoration="custom"] #titlebar {
 
 .status-tools {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 2px;
 }
@@ -666,7 +730,8 @@ kbd {
 
 /* ---- Einstellungen ---- */
 
-.settings {
+.settings,
+.about {
   align-self: flex-start;
   display: flex;
   flex-direction: column;
@@ -681,7 +746,9 @@ kbd {
 }
 
 .settings-head,
-.settings-foot {
+.settings-foot,
+.about-head,
+.about-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -690,16 +757,19 @@ kbd {
   flex-shrink: 0;
 }
 
-.settings-head {
+.settings-head,
+.about-head {
   border-bottom: 1px solid var(--border);
 }
 
-.settings-head h2 {
+.settings-head h2,
+.about-head h2 {
   font-size: 14px;
   font-weight: 600;
 }
 
-.settings-foot {
+.settings-foot,
+.about-foot {
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
@@ -729,6 +799,74 @@ kbd {
 /* ---- Tastenkürzel (Strg+K) ---- */
 
 /*
+ * „Über Rui" — schmaler als die Einstellungen, weil nichts darin
+ * eingestellt wird. Der Dialog ist eine Visitenkarte und eine Quelle für
+ * die Zeile, die in einen Fehlerbericht gehört.
+ */
+.about {
+  width: min(400px, calc(100vw - 48px));
+}
+
+/* Der Rahmen bekommt den Fokus nur, damit `Esc` ankommt — sichtbar
+   markiert werden muss er dafür nicht. */
+.about:focus {
+  outline: none;
+}
+
+.about-body {
+  padding: 22px 20px 18px;
+  text-align: center;
+}
+
+.about-mark svg {
+  display: block;
+  margin: 0 auto 10px;
+  border-radius: 12px;
+}
+
+.about-name {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.about-tagline {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/*
+ * Zwei Spalten, links die Bezeichnung, rechts der Wert. Linksbündig,
+ * obwohl der Kopf darüber zentriert ist: Versionsnummern liest man
+ * untereinander, und dafür müssen sie an derselben Kante beginnen.
+ */
+.about-facts {
+  display: grid;
+  gap: 4px 14px;
+  margin-top: 18px;
+  grid-template-columns: auto 1fr;
+  font-size: 12px;
+  text-align: left;
+}
+
+.about-facts dt {
+  color: var(--muted);
+}
+
+.about-facts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Der Repository-Knopf sitzt in einer Wertspalte und darf dort nicht
+   aussehen wie ein Knopf, sondern wie der Link, der er ist. */
+.about-facts .link-btn {
+  padding: 0;
+  text-align: left;
+}
+
+/*
  * Breiter als die Palette und in Spalten: Die Vim-Liste ist lang, und
  * Kürzel schlägt man mit den Augen nach, nicht mit dem Bildlauf.
  */
@@ -750,6 +888,47 @@ kbd {
 .shortcuts-head h2 {
   font-size: 14px;
   font-weight: 600;
+}
+
+/*
+ * Die Kategoriereiter.
+ *
+ * Mit eingeschalteter Vim-Steuerung stehen über achtzig Zeilen in der
+ * Liste. Die Suche findet darin alles, aber nur, wenn man weiss, wonach
+ * man sucht — die Reiter sind für den anderen Fall: „irgendwas mit der
+ * Zwischenablage, zeig mir mal alles davon".
+ */
+.shortcuts-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.shortcuts-cats[hidden] {
+  display: none;
+}
+
+.shortcuts-cat {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.shortcuts-cat:hover {
+  color: var(--text);
+}
+
+.shortcuts-cat.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
 .shortcuts-body {

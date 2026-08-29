@@ -18,6 +18,65 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.5.1] — 2026-08-29
+
+### Hinzugefügt
+- **Der Dateiname steht jetzt in der Statusleiste**, rechts vor Zeile und
+  Spalte und in der Textfarbe, während alles daneben gedämpft bleibt. Er
+  stand bisher nur im Fenstertitel — und den gibt es unter Hyprland ohne
+  Dekoration gar nicht, bei zwei Rui-Fenstern nebeneinander erst recht
+  nicht gut lesbar. Ein `•` davor markiert ungespeicherte Änderungen, der
+  Mauszeiger zeigt den ganzen Pfad, und ein Klick legt ihn in die
+  Zwischenablage.
+- **„Über Rui"**, erreichbar über das Info-Symbol in der Statusleiste und
+  über die Befehlspalette. Darin stehen Version, Entwickler (jli software),
+  Lizenz, das Repository und der Unterbau; „Angaben kopieren" legt Version,
+  Tauri-Version und Webview-Kennung als Block in die Zwischenablage — die
+  Zeilen, mit denen ein Fehlerbericht anfängt. Die Zahlen werden zur
+  Laufzeit aus dem Bundle gelesen, stimmen also auch dann, wenn ein
+  Installer vom letzten Halbjahr im Ordner liegt.
+- **Die Kürzel-Übersicht hat Kategoriereiter.** Mit eingeschalteter
+  Vim-Steuerung standen dort über achtzig Zeilen am Stück; die Reiter
+  schneiden die Liste auf eine Gruppe herunter, die Suche bleibt der Weg
+  quer durch alle. Wer tippt, landet automatisch wieder bei „Alle" — eine
+  Suche, die stumm in einer Kategorie hängen bleibt, sieht aus wie „gibt
+  es nicht".
+- **Die Zwischenablage-Gruppe der Übersicht ist von drei auf fünfzehn
+  Zeilen gewachsen.** Neu stehen darin unter anderem `:%y+` für die ganze
+  Datei, `:10,20y+` für einen Zeilenbereich, `:.,$y+` ab dem Cursor,
+  `:'<,'>y+` für die Auswahl, `"+d` fürs Ausschneiden, `ggVG` gefolgt von
+  `"+y` und `:reg`. Alles Normalmodus-Befehle, die Rui längst konnte — sie
+  standen nur nirgends.
+- **`Strg+Umschalt+A` kopiert die ganze Datei in die Zwischenablage**, für
+  alle, die die Vim-Steuerung nicht anhaben. Der Befehl steht auch in der
+  Palette.
+- **`Alt+Z` schaltet den Zeilenumbruch**, wie in VS Code — der einzige
+  Kurzbefehl ohne `Strg`. Zum Lesen einer fremden Logdatei umlegen, zum
+  Schreiben zurück; der Weg über die Einstellungen war dafür zu weit.
+
+### Geändert
+- **Das Kopieren meldet sich.** `Strg+Umschalt+C` sagt jetzt „12 Zeilen
+  kopiert" statt gar nichts, und bei leerer Auswahl „Nichts ausgewählt"
+  statt stillschweigend nichts zu tun. Ein Kürzel, das schweigt, sieht aus
+  wie eines, das nicht ankommt.
+- **Die Marke „Geändert" ist aus der linken Hälfte verschwunden.** Der `•`
+  vor dem Dateinamen sagt dasselbe auf einem Zehntel der Breite; in einem
+  halbbreiten Fenster stand vorher „Geänder…" neben „• Un…", also zwei
+  halbe Wörter statt einer Auskunft. „Schreibgeschützt" und „Autosave"
+  bleiben, wo sie waren.
+- **Die Statusleiste hat jetzt eine Rangfolge, wenn der Platz knapp wird.**
+  Zuerst schrumpft die Zeilenzahl, dann die Kurzmeldung, die ohnehin nach
+  zwei Sekunden verschwindet. Dateiname, Marken und die Werkzeuge rechts
+  geben nie nach — vorher war das Zahnrad in einem schmalen Fenster als
+  Erstes weg.
+
+### Behoben
+- **„Im Dateimanager zeigen" und „settings.json öffnen" waren wirkungslos.**
+  Beide liefen über `openPath`, das die Berechtigung `opener:default` gar
+  nicht abdeckt — der Aufruf wurde also stumm abgewiesen. „Im Dateimanager
+  zeigen" nimmt jetzt `revealItemInDir` und markiert die Datei gleich mit,
+  und `opener:allow-open-path` steht in den Berechtigungen.
+
 ## [0.5.0] — 2026-08-29
 
 ### Hinzugefügt
@@ -735,7 +794,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.5.0...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/vikingjunior12/Rui/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/vikingjunior12/Rui/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vikingjunior12/Rui/compare/v0.3.10...v0.4.0
 [0.3.10]: https://github.com/vikingjunior12/Rui/compare/v0.3.9...v0.3.10

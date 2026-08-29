@@ -18,6 +18,7 @@
     "core:window:allow-start-dragging",
     "core:event:allow-listen",
     "opener:default",
+    "opener:allow-open-path",
     "dialog:allow-open",
     "dialog:allow-save",
     "dialog:allow-ask",

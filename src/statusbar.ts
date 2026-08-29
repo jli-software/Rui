@@ -16,6 +16,9 @@ export interface StatusActions {
   onPosition: () => void;
   onSettings: () => void;
   onShortcuts: () => void;
+  onAbout: () => void;
+  /** Klick auf den Dateinamen — legt den vollen Pfad in die Zwischenablage. */
+  onFile: () => void;
 }
 
 const LINE_ENDING_LABEL = { lf: "LF", crlf: "CRLF", cr: "CR" } as const;
@@ -54,6 +57,20 @@ const KEYBOARD_SVG = `
   </svg>`;
 
 /**
+ * Info, ebenfalls selbst gezeichnet: ein Kreis mit Punkt und Strich. Das
+ * ist die eine Form, die auf 14 px noch als „hier steht, was das hier
+ * ist" gelesen wird — ein Fragezeichen meint Hilfe, ein Buchstabe „i" in
+ * der Textschrift fällt neben zwei Strichzeichnungen aus dem Satz.
+ */
+const INFO_SVG = `
+  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"
+       stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+    <circle cx="8" cy="8" r="6.2" />
+    <path d="M8 7.2v4" />
+    <path d="M8 4.7h0" stroke-width="1.8" />
+  </svg>`;
+
+/**
  * Die einzige dauerhaft sichtbare Bedienfläche neben dem Text.
  *
  * Jedes Feld ist anklickbar und öffnet die zugehörige Auswahl — dadurch
@@ -67,6 +84,8 @@ const KEYBOARD_SVG = `
  * hierher und nicht in eine Menüleiste.
  */
 export class StatusBar {
+  /** Name der offenen Datei — das Feld, das am häufigsten gefragt ist. */
+  private readonly file: HTMLButtonElement;
   private readonly position: HTMLButtonElement;
   private readonly selection: HTMLSpanElement;
   private readonly language: HTMLButtonElement;
@@ -78,6 +97,7 @@ export class StatusBar {
   private readonly pending: HTMLSpanElement;
   private readonly settings: HTMLButtonElement;
   private readonly shortcuts: HTMLButtonElement;
+  private readonly about: HTMLButtonElement;
   /** Kurzmeldung nach einer Aktion, etwa `"notiz.md" geschrieben`. */
   private readonly message: HTMLSpanElement;
   private messageTimer: number | undefined;
@@ -91,6 +111,7 @@ export class StatusBar {
         <span class="status-message"></span>
       </div>
       <div class="status-right">
+        <button class="status-btn status-file"></button>
         <span class="status-selection"></span>
         <button class="status-btn status-position" title="Gehe zu Zeile (Strg+G)"></button>
         <button class="status-btn status-language" title="Sprache wählen"></button>
@@ -98,6 +119,9 @@ export class StatusBar {
         <button class="status-btn status-eol" title="Zeilenende wählen"></button>
         <span class="status-divider"></span>
         <div class="status-tools">
+          <button class="status-icon status-about" title="Über Rui" aria-label="Über Rui">
+            ${INFO_SVG}
+          </button>
           <button class="status-icon status-shortcuts" title="Tastenkürzel (Strg+K)" aria-label="Tastenkürzel">
             ${KEYBOARD_SVG}
           </button>
@@ -107,6 +131,7 @@ export class StatusBar {
         </div>
       </div>`;
 
+    this.file = root.querySelector(".status-file")!;
     this.position = root.querySelector(".status-position")!;
     this.selection = root.querySelector(".status-selection")!;
     this.language = root.querySelector(".status-language")!;
@@ -117,14 +142,17 @@ export class StatusBar {
     this.pending = root.querySelector(".status-pending")!;
     this.settings = root.querySelector(".status-settings")!;
     this.shortcuts = root.querySelector(".status-shortcuts")!;
+    this.about = root.querySelector(".status-about")!;
     this.message = root.querySelector(".status-message")!;
 
+    this.file.addEventListener("click", actions.onFile);
     this.position.addEventListener("click", actions.onPosition);
     this.language.addEventListener("click", actions.onLanguage);
     this.encoding.addEventListener("click", actions.onEncoding);
     this.lineEnding.addEventListener("click", actions.onLineEnding);
     this.settings.addEventListener("click", actions.onSettings);
     this.shortcuts.addEventListener("click", actions.onShortcuts);
+    this.about.addEventListener("click", actions.onAbout);
   }
 
   update(
@@ -134,6 +162,20 @@ export class StatusBar {
     modified: boolean,
     autosave: boolean,
   ) {
+    // Der Dateiname zuerst: Wer mit mehreren Reitern arbeitet, fragt beim
+    // Blick nach unten „welche Datei ist das hier", nicht „welche Spalte".
+    // Im Fenstertitel steht er zwar auch, aber unter Hyprland ohne
+    // Dekoration sieht man den Titel gar nicht — und mit mehreren Rui-
+    // Fenstern nebeneinander erst recht nicht das richtige.
+    const path = buffer.path;
+    const name = path ? path.split(/[\\/]/).pop() || path : "Unbenannt";
+    this.file.textContent = (modified ? "• " : "") + name;
+    this.file.classList.toggle("is-modified", modified);
+    this.file.classList.toggle("is-unnamed", !path);
+    this.file.title = path
+      ? `${path}\nKlick kopiert den Pfad`
+      : "Noch nicht gespeichert — Strg+S gibt der Notiz einen Namen";
+
     this.position.textContent = `Z ${info.line}, Sp ${info.column}`;
 
     if (info.selections > 1) {
@@ -154,7 +196,10 @@ export class StatusBar {
     // Vorgabe und braucht keinen Hinweis, Autosave an dagegen schon —
     // dann schreibt Rui die Datei, ohne dass jemand Strg+S gedrückt hat.
     if (autosave) marks.push("Autosave");
-    if (modified) marks.push("Geändert");
+    // „Geändert" stand bis 0.5.0 hier. Seit der Dateiname daneben steht,
+    // sagt der Punkt davor dasselbe auf einem Zehntel der Breite — und in
+    // einem halbbreiten Fenster war für beides kein Platz: Es stand dann
+    // „Geänder…" neben „• Un…", zwei halbe Wörter statt einer Auskunft.
     this.flags.textContent = marks.join(" · ");
     this.flags.classList.toggle("is-modified", modified);
   }

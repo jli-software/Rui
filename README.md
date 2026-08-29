@@ -64,9 +64,18 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 - Find and replace, go to line, undo/redo, bracket matching, auto-indent,
   code folding, line numbers (absolute or relative)
 - Command palette on `Ctrl+Shift+P` instead of a menu bar
-- Shortcut sheet on `Ctrl+K`, searchable, with the Vim commands up front
-  while Vim mode is on
-- Status bar you can click: position, language, encoding, line ending
+- Shortcut sheet on `Ctrl+K`, searchable and split into category tabs, with
+  the Vim commands up front while Vim mode is on. The clipboard section
+  spells out the normal-mode routes into the system clipboard — `:%y+`,
+  `:10,20y+`, `:'<,'>y+`, `"+d`, `:reg`
+- `Ctrl+Shift+C` copies the selection, `Ctrl+Shift+A` the whole file,
+  `Ctrl+Shift+V` pastes — all through the system clipboard, no Vim needed
+- `Alt+Z` toggles word wrap, for the difference between writing a note and
+  reading someone else's log
+- Status bar you can click: file name, position, language, encoding, line
+  ending. Click the name to copy the full path
+- **About Rui** behind the info icon: version, developer, licence, and one
+  button that copies the version block a bug report starts with
 
 **Files**
 
@@ -145,7 +154,8 @@ is automatic: own title bar on Windows, none under a tiling compositor.
 | `Ctrl+Shift+O` | Open via system dialog |
 | `Ctrl+N` / `Ctrl+S` / `Ctrl+Shift+S` | New / Save / Save as |
 | `Ctrl+F` / `Ctrl+G` | Find and replace / Go to line |
-| `Ctrl+Shift+C` / `Ctrl+Shift+V` | System clipboard |
+| `Ctrl+Shift+C` / `Ctrl+Shift+A` / `Ctrl+Shift+V` | Copy selection / Copy whole file / Paste |
+| `Alt+Z` | Word wrap on or off |
 | `Ctrl+T` / `Ctrl+W` / `Ctrl+Tab` | New tab / Close tab / Next tab |
 | `Ctrl+K` | Keyboard shortcuts |
 | `Ctrl+I` | Settings |
