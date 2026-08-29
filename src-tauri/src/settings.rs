@@ -202,10 +202,10 @@ fn default_mono_stack() -> String {
         .to_string()
 }
 
-/// Zustand eines Puffers zwischen zwei Programmstarts.
+/// Zustand eines einzelnen Tabs zwischen zwei Programmstarts.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
-pub struct Session {
+pub struct TabSession {
     pub path: Option<String>,
     /// Nur gesetzt, wenn beim Beenden ungespeicherte Änderungen offen waren.
     pub unsaved_content: Option<String>,
@@ -218,6 +218,35 @@ pub struct Session {
     /// gestern angelegter, noch namenloser Puffer nach dem Neustart das
     /// heutige Datum in den Dateinamen.
     pub created_at_ms: Option<i64>,
+    /// Von Hand gewählte Sprache. Sie gehört zum Tab und nicht zur Datei —
+    /// wer eine `.log` als PowerShell liest, will sie nach dem Neustart
+    /// nicht wieder ungefärbt vor sich haben.
+    pub language_override: Option<String>,
+}
+
+/// Alle offenen Tabs zwischen zwei Programmstarts.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Session {
+    pub tabs: Vec<TabSession>,
+    /// Index des aktiven Tabs. Liegt er daneben, fängt das Frontend das ab.
+    pub active: usize,
+}
+
+/// Bis 0.3.10 kannte die Sitzung genau einen Puffer und schrieb dessen
+/// Felder direkt in die Wurzel der Datei. Wer von dieser Fassung kommt,
+/// soll seinen Puffer als ersten Tab wiederfinden statt eine leere Rui.
+fn migrate_session(value: serde_json::Value) -> Session {
+    if value.get("tabs").is_some() {
+        return serde_json::from_value(value).unwrap_or_default();
+    }
+    match serde_json::from_value::<TabSession>(value) {
+        Ok(tab) if tab.path.is_some() || tab.unsaved_content.is_some() => Session {
+            tabs: vec![tab],
+            active: 0,
+        },
+        _ => Session::default(),
+    }
 }
 
 fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -262,7 +291,8 @@ pub fn settings_path(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 pub fn load_session(app: AppHandle) -> Result<Session, String> {
-    Ok(read_json(&config_dir(&app)?.join("session.json")))
+    let value: serde_json::Value = read_json(&config_dir(&app)?.join("session.json"));
+    Ok(migrate_session(value))
 }
 
 #[tauri::command]
@@ -308,6 +338,39 @@ mod tests {
         assert_eq!(s.note_date_format, NoteDateFormat::YmdHm);
         assert_eq!(s.autosave_delay_ms, 500);
         assert!(!s.vim_mode);
+    }
+
+    /// Eine Sitzungsdatei aus 0.3.x hat ihren einen Puffer direkt in der
+    /// Wurzel stehen. Sie darf beim Umstieg auf Tabs nicht verpuffen.
+    #[test]
+    fn alte_sitzung_wird_zum_ersten_tab() {
+        let alt = r#"{ "path": "/tmp/notiz.md", "cursor": 42, "bom": false }"#;
+        let session = migrate_session(serde_json::from_str(alt).unwrap());
+
+        assert_eq!(session.tabs.len(), 1);
+        assert_eq!(session.tabs[0].path.as_deref(), Some("/tmp/notiz.md"));
+        assert_eq!(session.tabs[0].cursor, 42);
+        assert_eq!(session.active, 0);
+    }
+
+    /// Eine leere oder unbrauchbare Datei ergibt keine Geister-Tabs.
+    #[test]
+    fn leere_sitzung_bleibt_leer() {
+        assert!(migrate_session(serde_json::Value::Null).tabs.is_empty());
+        assert!(migrate_session(serde_json::json!({})).tabs.is_empty());
+        assert!(migrate_session(serde_json::json!({ "tabs": [], "active": 0 }))
+            .tabs
+            .is_empty());
+    }
+
+    /// Die neue Fassung geht unverändert durch die Migration.
+    #[test]
+    fn neue_sitzung_behält_alle_tabs() {
+        let neu = r#"{ "tabs": [{ "path": "/a.txt" }, { "path": "/b.txt" }], "active": 1 }"#;
+        let session = migrate_session(serde_json::from_str(neu).unwrap());
+
+        assert_eq!(session.tabs.len(), 2);
+        assert_eq!(session.active, 1);
     }
 
     /// Die eine Vorgabe, die keine Version stillschweigend umdrehen darf:

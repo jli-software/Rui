@@ -13,6 +13,7 @@ import { CommandPalette, promptInput, type Command } from "./palette";
 import { QuickOpen } from "./quick-open";
 import { SettingsDialog } from "./settings-ui";
 import { StatusBar } from "./statusbar";
+import { TabBar, tabTitle, type Tab } from "./tabs";
 import { TitleBar } from "./titlebar";
 import { omarchyPalette, sageDark, sageLight } from "./theme";
 import {
@@ -32,34 +33,46 @@ import type {
   ResolvedDecoration,
   Session,
   Settings,
+  TabSession,
 } from "./types";
 
 import "./styles.css";
 
 const ENCODINGS = ["UTF-8", "windows-1252", "ISO-8859-1", "UTF-16LE", "UTF-16BE"];
 
+/**
+ * Wohin eine Datei geöffnet wird.
+ *
+ * `tab` macht einen Reiter auf — der Weg von Quick Open, Dateidialog und
+ * Drag-and-drop. `current` ersetzt den Puffer im sichtbaren Tab, wie Vims
+ * `:e` es tut.
+ */
+type OpenTarget = "tab" | "current";
+
 class App {
   private editor!: RuiEditor;
   private palette!: CommandPalette;
   private quickOpen!: QuickOpen;
   private settingsDialog!: SettingsDialog;
-  private status!: StatusBar;
   private titlebar!: TitleBar;
   private omarchyAvailable = false;
 
-  private settings!: Settings;
-  private buffer!: Buffer;
-  private language: LanguageDef = LANGUAGES[0];
+  private status!: StatusBar;
+  private tabBar!: TabBar;
 
-  /** Sprache, die der Nutzer von Hand gewählt hat; überschreibt die Erkennung. */
-  private languageOverride: string | null = null;
+  private settings!: Settings;
+  /** Alle offenen Tabs. Es ist immer mindestens einer da. */
+  private tabs: Tab[] = [];
+  private activeIndex = 0;
+  private nextTabId = 1;
   private sessionTimer: number | undefined;
   private autosaveTimer: number | undefined;
+  /** Ob ein Autosave aussteht — der Tabwechsel muss ihn vorher ausführen. */
+  private autosavePending = false;
   private closing = false;
 
   async start() {
     this.settings = await invoke<Settings>("load_settings");
-    this.buffer = this.emptyBuffer();
 
     const host = document.querySelector<HTMLElement>("#editor")!;
     this.editor = new RuiEditor(
@@ -77,8 +90,15 @@ class App {
         write: (target) => this.save(target),
         edit: (target, force) => this.edit(target, force),
         quit: (force) => void this.quit(force),
+        quitAll: (force) => void this.quitAll(force),
+        tabNew: (target) => void this.edit(target, false, "tab"),
+        tabCycle: (delta) => void this.cycleTab(delta),
+        tabClose: (force) => void this.closeTab(this.tab.id, force),
       },
     );
+
+    // Der erste Tab hält den Zustand, den der Editor gerade gebaut hat.
+    this.tabs = [this.freshTab()];
 
     this.palette = new CommandPalette(() => this.commands());
     this.settingsDialog = new SettingsDialog(
@@ -111,6 +131,11 @@ class App {
       onLineEnding: () => this.pickLineEnding(),
       onSettings: () => this.settingsDialog.open(),
     });
+    this.tabBar = new TabBar(document.querySelector<HTMLElement>("#tabs")!, {
+      onSelect: (id) => void this.activate(this.indexOf(id)),
+      onClose: (id) => void this.closeTab(id),
+      onNew: () => void this.newTab(),
+    });
     this.titlebar = new TitleBar(document.querySelector<HTMLElement>("#titlebar")!);
 
     this.bindShortcuts();
@@ -122,7 +147,7 @@ class App {
     await this.applyDecoration(this.settings.decorationMode);
     await this.refreshOmarchyTheme();
 
-    await this.restoreStartupDocument();
+    await this.restoreTabs();
 
     this.refreshStatus();
     await getCurrentWindow().show();
@@ -152,7 +177,201 @@ class App {
     return folders;
   }
 
-  // ---- Puffer -----------------------------------------------------------
+  // ---- Tabs -------------------------------------------------------------
+
+  /** Der sichtbare Tab. Es gibt immer mindestens einen. */
+  private get tab(): Tab {
+    return this.tabs[this.activeIndex];
+  }
+
+  private get buffer(): Buffer {
+    return this.tab.buffer;
+  }
+
+  private get language(): LanguageDef {
+    return this.tab.language;
+  }
+
+  private indexOf(id: number): number {
+    return this.tabs.findIndex((tab) => tab.id === id);
+  }
+
+  /**
+   * Der Text eines Tabs.
+   *
+   * Der sichtbare hat keinen eigenen `state` — sein Text steht in der
+   * View, und nur dort ist er aktuell.
+   */
+  private contentOf(tab: Tab): string {
+    return tab === this.tab ? this.editor.content : (tab.state?.doc.toString() ?? "");
+  }
+
+  private isModifiedTab(tab: Tab): boolean {
+    return this.contentOf(tab) !== tab.buffer.savedContent;
+  }
+
+  /** Ein leerer Tab mit dem Zustand, der gerade im Editor steht. */
+  private freshTab(): Tab {
+    return {
+      id: this.nextTabId++,
+      buffer: this.emptyBuffer(),
+      language: LANGUAGES[0],
+      languageOverride: null,
+      state: null,
+      scrollTop: 0,
+      modified: false,
+    };
+  }
+
+  /**
+   * Legt den Zustand des sichtbaren Tabs weg, bevor ein anderer ihn
+   * ablöst. Danach lebt der Text dieses Tabs in seinem `state` und nicht
+   * mehr in der View.
+   */
+  private stash(tab: Tab) {
+    tab.state = this.editor.snapshot();
+    tab.scrollTop = this.editor.view.scrollDOM.scrollTop;
+    tab.modified = this.isModifiedTab(tab);
+  }
+
+  /**
+   * Zeigt den aktiven Tab an.
+   *
+   * Die Compartments werden danach durchgehend nachgezogen: Ein Zustand,
+   * der vor einer Einstellungsänderung weggelegt wurde, trüge sonst die
+   * alte Konfiguration zurück — ein Tab käme etwa ohne Zeilennummern
+   * wieder, nur weil er beim Umschalten nicht sichtbar war.
+   */
+  private async show(checkExternal = true) {
+    const tab = this.tab;
+    this.editor.restore(tab.state ?? this.editor.freshState(""));
+    tab.state = null;
+    this.editor.applySettings(this.settings);
+    await this.editor.applyVimMode();
+    await this.editor.applyLanguage(tab.language);
+    this.editor.setReadOnly(tab.buffer.readOnly);
+    // Zweimal: Direkt nach `setState` hat CodeMirror die Zeilen noch nicht
+    // gemessen, der Inhalt ist womöglich gar nicht hoch genug, um so weit
+    // zu scrollen. Der zweite Griff sitzt, sofern nicht inzwischen wieder
+    // umgeschaltet wurde.
+    const top = tab.scrollTop;
+    this.editor.view.scrollDOM.scrollTop = top;
+    requestAnimationFrame(() => {
+      if (this.tab === tab) this.editor.view.scrollDOM.scrollTop = top;
+    });
+    this.refreshStatus();
+    this.scheduleSessionSave();
+    if (checkExternal) void this.checkExternalChange();
+  }
+
+  /** Wechselt zu einem Tab. */
+  private async activate(index: number) {
+    if (index < 0 || index >= this.tabs.length || index === this.activeIndex) return;
+    // Ein Autosave, der noch aussteht, gehört dem Tab, der gerade sichtbar
+    // ist — nach dem Wechsel fände sein Timer den falschen Puffer vor.
+    await this.flushAutosave();
+    this.stash(this.tab);
+    this.activeIndex = index;
+    await this.show();
+  }
+
+  /** Einen Tab weiter, mit Umlauf an beiden Enden. */
+  private async cycleTab(delta: number) {
+    const count = this.tabs.length;
+    if (count < 2) return;
+    await this.activate((this.activeIndex + delta + count) % count);
+  }
+
+  /**
+   * Legt einen Tab an und zeigt ihn an.
+   *
+   * Er kommt direkt rechts neben den aktiven, nicht ans Ende: Wer aus
+   * einer Datei heraus die nächste öffnet, findet sie daneben.
+   */
+  private async addTab(init: {
+    buffer: Buffer;
+    content: string;
+    language: LanguageDef;
+    languageOverride?: string | null;
+  }) {
+    await this.flushAutosave();
+    if (this.tabs.length > 0) this.stash(this.tab);
+
+    const tab: Tab = {
+      id: this.nextTabId++,
+      buffer: init.buffer,
+      language: init.language,
+      languageOverride: init.languageOverride ?? null,
+      state: this.editor.freshState(init.content),
+      scrollTop: 0,
+      modified: init.content !== init.buffer.savedContent,
+    };
+    const at = this.tabs.length === 0 ? 0 : this.activeIndex + 1;
+    this.tabs.splice(at, 0, tab);
+    this.activeIndex = at;
+    await this.show();
+  }
+
+  /** Strg+T und Strg+N — ein leerer Tab. */
+  private async newTab() {
+    await this.addTab({ buffer: this.emptyBuffer(), content: "", language: LANGUAGES[0] });
+  }
+
+  /**
+   * Schliesst einen Tab.
+   *
+   * Anders als beim Fenster fängt die Sitzung einen geschlossenen Tab
+   * **nicht** auf — sie merkt sich, was offen ist. Deshalb wird hier auch
+   * bei eingeschalteter Sitzungswiederherstellung gefragt.
+   */
+  private async closeTab(id: number, force = false): Promise<boolean> {
+    const index = this.indexOf(id);
+    if (index < 0) return false;
+    const tab = this.tabs[index];
+
+    if (!force && this.settings.confirmOnClose && this.isModifiedTab(tab)) {
+      const discard = await ask(
+        `"${tabTitle(tab)}" enthält ungespeicherte Änderungen. Verwerfen?`,
+        {
+          title: "Tab schliessen",
+          kind: "warning",
+          okLabel: "Verwerfen",
+          cancelLabel: "Abbrechen",
+        },
+      );
+      if (!discard) return false;
+    }
+
+    // Der letzte Tab wird geleert statt geschlossen: Rui ohne Puffer gibt
+    // es nicht, und ein Editor, der beim Schliessen des letzten Reiters
+    // ganz verschwindet, nimmt einem die Entscheidung ab. `:q` geht
+    // bewusst den anderen Weg — siehe `quit()`.
+    if (this.tabs.length === 1) {
+      this.cancelAutosave();
+      this.tabs[0] = this.freshTab();
+      this.activeIndex = 0;
+      this.editor.loadDocument("");
+      this.editor.setReadOnly(false);
+      await this.setLanguage(LANGUAGES[0]);
+      this.scheduleSessionSave();
+      return true;
+    }
+
+    if (index !== this.activeIndex) {
+      if (index < this.activeIndex) this.activeIndex--;
+      this.tabs.splice(index, 1);
+      this.refreshStatus();
+      this.scheduleSessionSave();
+      return true;
+    }
+
+    this.cancelAutosave();
+    this.tabs.splice(index, 1);
+    // Nach rechts weiterrücken, am Ende nach links — wie im Browser.
+    this.activeIndex = Math.min(index, this.tabs.length - 1);
+    await this.show();
+    return true;
+  }
 
   private emptyBuffer(): Buffer {
     return {
@@ -171,6 +390,20 @@ class App {
     return this.editor.content !== this.buffer.savedContent;
   }
 
+  /** Ob eine Datei schon in einem Tab offen ist. */
+  private openTabFor(path: string): number {
+    return this.tabs.findIndex((tab) => samePath(tab.buffer.path, path));
+  }
+
+  /**
+   * Ein leerer, unberührter Tab — in den darf eine Datei direkt hinein,
+   * statt einen zweiten aufzumachen und einen unbenutzten stehen zu
+   * lassen.
+   */
+  private get isScratch(): boolean {
+    return !this.buffer.path && !this.isModified;
+  }
+
   private get fileName() {
     if (!this.buffer.path) return "Unbenannt";
     return this.buffer.path.split(/[\\/]/).pop() ?? "Unbenannt";
@@ -183,21 +416,25 @@ class App {
   }
 
   private refreshStatus() {
+    const modified = this.isModified;
     this.status.update(
       this.editor.cursorInfo(),
       this.buffer,
       this.language.name,
-      this.isModified,
+      modified,
       this.settings.autosave,
     );
-    const mark = this.isModified ? "• " : "";
+    this.tab.modified = modified;
+    this.tabBar.render(this.tabs, this.tab.id);
+
+    const mark = modified ? "• " : "";
     const title = `${mark}${this.fileName} — Rui`;
     void getCurrentWindow().setTitle(title);
     this.titlebar.setTitle(title);
   }
 
   private async setLanguage(lang: LanguageDef) {
-    this.language = lang;
+    this.tab.language = lang;
     await this.editor.applyLanguage(lang);
     this.refreshStatus();
   }
@@ -214,29 +451,98 @@ class App {
     });
   }
 
-  private async newFile() {
-    if (!(await this.confirmDiscard())) return;
-    // Ein ausstehender Autosave gehörte zum alten Puffer und hat jetzt
-    // kein Ziel mehr.
-    window.clearTimeout(this.autosaveTimer);
-    this.buffer = this.emptyBuffer();
-    this.languageOverride = null;
-    this.editor.loadDocument("");
-    this.editor.setReadOnly(false);
-    await this.setLanguage(LANGUAGES[0]);
+  /** Mehrere Dateien nacheinander öffnen — jede in ihrem Tab. */
+  private async openAll(paths: string[]) {
+    for (const path of paths) await this.openPath(path);
+  }
+
+  /**
+   * Rückfrage vor dem Schliessen des Fensters, wenn irgendein Tab
+   * ungespeichert ist. Bis 0.3.10 gab es nur einen Puffer, um den es
+   * gehen konnte.
+   */
+  private async confirmUnsaved(): Promise<boolean> {
+    if (!this.settings.confirmOnClose) return true;
+    const dirty = this.tabs.filter((tab) => this.isModifiedTab(tab));
+    if (dirty.length === 0) return true;
+
+    const names = dirty.map((tab) => `„${tabTitle(tab)}"`).join(", ");
+    const text =
+      dirty.length === 1
+        ? `${names} enthält ungespeicherte Änderungen. Verwerfen?`
+        : `${dirty.length} Tabs enthalten ungespeicherte Änderungen (${names}). Verwerfen?`;
+    return ask(text, {
+      title: "Rui",
+      kind: "warning",
+      okLabel: "Verwerfen",
+      cancelLabel: "Abbrechen",
+    });
   }
 
   private async openFileDialog() {
-    const selected = await openDialog({ multiple: false, filters: dialogFilters() });
-    if (typeof selected === "string") await this.openPath(selected);
+    const selected = await openDialog({ multiple: true, filters: dialogFilters() });
+    const paths = typeof selected === "string" ? [selected] : (selected ?? []);
+    for (const path of paths) await this.openPath(path);
   }
 
-  async openPath(path: string, force = false) {
-    if (!force && !(await this.confirmDiscard())) return;
+  /**
+   * Eine Datei öffnen.
+   *
+   * Ohne Angabe landet sie in einem eigenen Tab — ist sie schon offen,
+   * springt Rui stattdessen dorthin, statt dieselbe Datei zweimal
+   * bearbeitbar zu machen. `where: "current"` ersetzt den Puffer im
+   * sichtbaren Tab; das ist Vims `:e`.
+   */
+  async openPath(path: string, options: { force?: boolean; where?: OpenTarget } = {}) {
+    const where = options.where ?? "tab";
+    const force = options.force ?? false;
 
-    let doc: LoadedDocument;
+    if (where === "tab") {
+      const open = this.openTabFor(path);
+      if (open >= 0) {
+        await this.activate(open);
+        return;
+      }
+    }
+    if (where === "current" && !force && !(await this.confirmDiscard())) return;
+
+    const doc = await this.readDocument(path, force);
+    if (!doc) return;
+
+    const buffer: Buffer = {
+      path: doc.path,
+      encoding: doc.encoding,
+      bom: doc.bom,
+      lineEnding: doc.lineEnding,
+      readOnly: doc.readOnly,
+      mtimeMs: doc.mtimeMs,
+      savedContent: doc.content,
+      createdAtMs: Date.now(),
+    };
+    const language = detectLanguage(doc.path);
+
+    if (where === "tab" && !this.isScratch) {
+      await this.addTab({ buffer, content: doc.content, language });
+      return;
+    }
+
+    this.cancelAutosave();
+    this.tab.buffer = buffer;
+    this.tab.languageOverride = null;
+    this.editor.loadDocument(doc.content);
+    this.editor.setReadOnly(doc.readOnly);
+    await this.setLanguage(language);
+    this.scheduleSessionSave();
+  }
+
+  /**
+   * Liest eine Datei über `document.rs`. `null` heisst: Der Nutzer hat
+   * abgebrochen oder die Datei ist nicht lesbar — beides wurde ihm hier
+   * bereits gesagt.
+   */
+  private async readDocument(path: string, force: boolean): Promise<LoadedDocument | null> {
     try {
-      doc = await invoke<LoadedDocument>("open_file", { path, force });
+      return await invoke<LoadedDocument>("open_file", { path, force });
     } catch (err) {
       const text = String(err);
       // Grosse Dateien sind kein Fehler, sondern eine Rückfrage.
@@ -247,29 +553,11 @@ class App {
           `Diese Datei ist ${mb} MB gross. Rui ist auf Snippets ausgelegt und wird damit spürbar langsamer. Trotzdem öffnen?`,
           { title: "Grosse Datei", kind: "warning", okLabel: "Öffnen" },
         );
-        if (proceed) await this.openPath(path, true);
-        return;
+        return proceed ? this.readDocument(path, true) : null;
       }
       await message(text, { title: "Öffnen fehlgeschlagen", kind: "error" });
-      return;
+      return null;
     }
-
-    window.clearTimeout(this.autosaveTimer);
-    this.buffer = {
-      path: doc.path,
-      encoding: doc.encoding,
-      bom: doc.bom,
-      lineEnding: doc.lineEnding,
-      readOnly: doc.readOnly,
-      mtimeMs: doc.mtimeMs,
-      savedContent: doc.content,
-      createdAtMs: Date.now(),
-    };
-    this.languageOverride = null;
-    this.editor.loadDocument(doc.content);
-    this.editor.setReadOnly(doc.readOnly);
-    await this.setLanguage(detectLanguage(doc.path));
-    this.scheduleSessionSave();
   }
 
   /**
@@ -329,7 +617,7 @@ class App {
     }
 
     const ok = await this.writeTo(path);
-    if (ok && !this.languageOverride) await this.setLanguage(detectLanguage(path));
+    if (ok && !this.tab.languageOverride) await this.setLanguage(detectLanguage(path));
     return ok;
   }
 
@@ -371,7 +659,7 @@ class App {
       this.buffer.savedContent = this.editor.content;
       this.refreshStatus();
       this.scheduleSessionSave();
-      if (!this.languageOverride) await this.setLanguage(detectLanguage(result.path));
+      if (!this.tab.languageOverride) await this.setLanguage(detectLanguage(result.path));
       return true;
     } catch (err) {
       await message(String(err), { title: "Speichern fehlgeschlagen", kind: "error" });
@@ -386,7 +674,7 @@ class App {
     });
     if (!target) return false;
     const ok = await this.writeTo(target);
-    if (ok && !this.languageOverride) await this.setLanguage(detectLanguage(target));
+    if (ok && !this.tab.languageOverride) await this.setLanguage(detectLanguage(target));
     return ok;
   }
 
@@ -394,12 +682,18 @@ class App {
    * `:e <pfad>` — eine Datei öffnen; ohne Pfad die aktuelle neu laden.
    *
    * `:e!` verwirft ungespeicherte Änderungen ohne Rückfrage, wie in Vim.
+   * `where: "tab"` ist derselbe Weg für `:tabnew` — dort verwirft nichts
+   * etwas, weil der Puffer daneben stehen bleibt.
    */
-  private async edit(target: string | undefined, force: boolean) {
+  private async edit(target: string | undefined, force: boolean, where: OpenTarget = "current") {
     if (target === undefined) {
+      if (where === "tab") {
+        await this.newTab();
+        return;
+      }
       if (!this.buffer.path) return;
       if (!force && !(await this.confirmDiscard())) return;
-      await this.openPath(this.buffer.path, true);
+      await this.openPath(this.buffer.path, { force: true, where: "current" });
       return;
     }
 
@@ -418,15 +712,20 @@ class App {
     // Wie in Vim: `:e neue-datei.ps1` legt einen Puffer für einen Namen an,
     // den es noch nicht gibt. Geschrieben wird er erst mit `:w`.
     if (!(await this.exists(path))) {
+      const buffer: Buffer = { ...this.emptyBuffer(), path };
+      if (where === "tab" && !this.isScratch) {
+        await this.addTab({ buffer, content: "", language: detectLanguage(path) });
+        return;
+      }
       if (!force && !(await this.confirmDiscard())) return;
-      this.buffer = { ...this.emptyBuffer(), path };
-      this.languageOverride = null;
+      this.tab.buffer = buffer;
+      this.tab.languageOverride = null;
       this.editor.loadDocument("");
       this.editor.setReadOnly(false);
       await this.setLanguage(detectLanguage(path));
       return;
     }
-    await this.openPath(path, force);
+    await this.openPath(path, { force, where });
   }
 
   private async writeTo(path: string): Promise<boolean> {
@@ -510,7 +809,7 @@ class App {
         : `"${this.fileName}" wurde ausserhalb von Rui geändert. Neu laden?`,
       { title: "Datei geändert", kind: "warning", okLabel: "Neu laden", cancelLabel: "Behalten" },
     );
-    if (reload) await this.openPath(this.buffer.path, true);
+    if (reload) await this.openPath(this.buffer.path, { force: true, where: "current" });
   }
 
   // ---- Autosave ----------------------------------------------------------
@@ -526,13 +825,33 @@ class App {
   private scheduleAutosave() {
     if (!this.settings.autosave) return;
     window.clearTimeout(this.autosaveTimer);
+    this.autosavePending = true;
     this.autosaveTimer = window.setTimeout(
       () => void this.autosave(),
       this.settings.autosaveDelayMs,
     );
   }
 
+  /** Ein ausstehender Autosave gehörte zu einem Puffer, den es nicht mehr gibt. */
+  private cancelAutosave() {
+    window.clearTimeout(this.autosaveTimer);
+    this.autosavePending = false;
+  }
+
+  /**
+   * Führt einen ausstehenden Autosave sofort aus.
+   *
+   * Vor jedem Tabwechsel: Der Timer arbeitet immer auf dem sichtbaren
+   * Puffer, und nach dem Wechsel wäre das der falsche.
+   */
+  private async flushAutosave() {
+    if (!this.autosavePending) return;
+    window.clearTimeout(this.autosaveTimer);
+    await this.autosave();
+  }
+
   private async autosave() {
+    this.autosavePending = false;
     if (!this.settings.autosave || this.buffer.readOnly) return;
 
     const content = this.editor.content;
@@ -581,14 +900,8 @@ class App {
   private async saveSession() {
     if (!this.settings.restoreSession) return;
     const session: Session = {
-      path: this.buffer.path,
-      unsavedContent: this.isModified ? this.editor.content : null,
-      cursor: this.editor.view.state.selection.main.head,
-      scrollTop: this.editor.view.scrollDOM.scrollTop,
-      encoding: this.buffer.encoding,
-      lineEnding: this.buffer.lineEnding,
-      bom: this.buffer.bom,
-      createdAtMs: this.buffer.createdAtMs,
+      tabs: this.tabs.map((tab) => this.sessionFor(tab)),
+      active: this.activeIndex,
     };
     try {
       await invoke("save_session", { session });
@@ -597,41 +910,112 @@ class App {
     }
   }
 
+  private sessionFor(tab: Tab): TabSession {
+    const active = tab === this.tab;
+    const state = active ? this.editor.view.state : tab.state;
+    return {
+      path: tab.buffer.path,
+      unsavedContent: this.isModifiedTab(tab) ? this.contentOf(tab) : null,
+      cursor: state?.selection.main.head ?? 0,
+      scrollTop: active ? this.editor.view.scrollDOM.scrollTop : tab.scrollTop,
+      encoding: tab.buffer.encoding,
+      lineEnding: tab.buffer.lineEnding,
+      bom: tab.buffer.bom,
+      createdAtMs: tab.buffer.createdAtMs,
+      languageOverride: tab.languageOverride,
+    };
+  }
+
   /**
    * Reihenfolge beim Start: Kommandozeile schlägt Sitzung. Wer eine Datei
-   * per Doppelklick öffnet, will diese sehen und nicht den alten Puffer.
+   * per Doppelklick öffnet, will diese sehen und nicht die alten Tabs.
    */
-  private async restoreStartupDocument() {
+  private async restoreTabs() {
     const files = await invoke<string[]>("startup_files");
     if (files.length > 0) {
-      await this.openPath(files[0], true);
+      // `rui a.ps1 b.ps1` öffnet beide — bis 0.3.10 fiel alles ausser der
+      // ersten Datei still unter den Tisch.
+      for (const file of files) await this.openPath(file, { force: true });
       return;
     }
     if (!this.settings.restoreSession) return;
 
     const session = await invoke<Session>("load_session");
-    if (session.path) {
-      await this.openPath(session.path, true);
+    const restored: Tab[] = [];
+    for (const entry of session.tabs) {
+      const tab = await this.restoreTab(entry);
+      if (tab) restored.push(tab);
     }
-    // Nach `openPath` gesetzt: das legt den Puffer neu an und würde die
-    // Entstehungszeit sonst auf jetzt stellen — ein gestern begonnener,
-    // noch namenloser Puffer bekäme dann das heutige Datum als Namen.
-    if (session.createdAtMs) this.buffer.createdAtMs = session.createdAtMs;
-    if (session.unsavedContent !== null && session.unsavedContent !== undefined) {
-      // Der ungespeicherte Stand gewinnt gegen den Dateiinhalt — sonst
-      // wäre das Sicherheitsnetz nutzlos.
-      this.editor.loadDocument(session.unsavedContent);
-      if (session.encoding) this.buffer.encoding = session.encoding;
-      if (session.lineEnding) this.buffer.lineEnding = session.lineEnding;
-      this.buffer.bom = session.bom;
+    if (restored.length === 0) return;
+
+    this.tabs = restored;
+    this.activeIndex = Math.min(Math.max(session.active, 0), restored.length - 1);
+    // Ohne Prüfung auf externe Änderungen: Das Fenster ist noch gar nicht
+    // sichtbar, ein Dialog davor käme aus dem Nichts.
+    await this.show(false);
+  }
+
+  /**
+   * Einen Tab aus der Sitzung wiederherstellen. `null`, wenn die Datei
+   * verschwunden ist und es auch nichts Ungespeichertes zu retten gibt.
+   */
+  private async restoreTab(entry: TabSession): Promise<Tab | null> {
+    let buffer: Buffer = { ...this.emptyBuffer(), path: entry.path };
+    if (entry.path) {
+      const doc = await invoke<LoadedDocument>("open_file", {
+        path: entry.path,
+        force: true,
+      }).catch(() => null);
+      if (!doc) {
+        // Datei weg. Ungespeichertes bleibt trotzdem gerettet — genau
+        // dafür ist die Sitzung da.
+        if (entry.unsavedContent === null || entry.unsavedContent === undefined) return null;
+      } else {
+        buffer = {
+          path: doc.path,
+          encoding: doc.encoding,
+          bom: doc.bom,
+          lineEnding: doc.lineEnding,
+          readOnly: doc.readOnly,
+          mtimeMs: doc.mtimeMs,
+          savedContent: doc.content,
+          createdAtMs: Date.now(),
+        };
+      }
     }
-    if (session.cursor) {
-      const max = this.editor.view.state.doc.length;
-      this.editor.view.dispatch({
-        selection: { anchor: Math.min(session.cursor, max) },
-        scrollIntoView: true,
-      });
+
+    let content = buffer.savedContent;
+    // Der ungespeicherte Stand gewinnt gegen den Dateiinhalt — sonst wäre
+    // das Sicherheitsnetz nutzlos.
+    if (entry.unsavedContent !== null && entry.unsavedContent !== undefined) {
+      content = entry.unsavedContent;
+      if (entry.encoding) buffer.encoding = entry.encoding;
+      if (entry.lineEnding) buffer.lineEnding = entry.lineEnding;
+      buffer.bom = entry.bom;
     }
+    // Die Entstehungszeit kommt aus der Sitzung: Ein gestern begonnener,
+    // noch namenloser Puffer bekäme sonst heute ein neues Datum als Namen.
+    if (entry.createdAtMs) buffer.createdAtMs = entry.createdAtMs;
+
+    let state = this.editor.freshState(content);
+    if (entry.cursor) {
+      state = state.update({
+        selection: { anchor: Math.min(entry.cursor, state.doc.length) },
+      }).state;
+    }
+
+    const override = entry.languageOverride
+      ? (LANGUAGES.find((lang) => lang.id === entry.languageOverride) ?? null)
+      : null;
+    return {
+      id: this.nextTabId++,
+      buffer,
+      language: override ?? detectLanguage(buffer.path),
+      languageOverride: override?.id ?? null,
+      state,
+      scrollTop: entry.scrollTop,
+      modified: content !== buffer.savedContent,
+    };
   }
 
   // ---- Einstellungen ----------------------------------------------------
@@ -743,7 +1127,7 @@ class App {
         title: lang.name,
         state: () => (lang.id === this.language.id ? "aktiv" : ""),
         run: async () => {
-          this.languageOverride = lang.id;
+          this.tab.languageOverride = lang.id;
           await this.setLanguage(lang);
         },
       })),
@@ -796,10 +1180,24 @@ class App {
   }
 
   /**
-   * `:q` aus der Vim-Steuerung. Geht bewusst denselben Weg wie das
-   * Fensterkreuz, damit Sitzung und Rückfrage nicht umgangen werden.
+   * `:q` aus der Vim-Steuerung.
+   *
+   * Sind mehrere Tabs offen, schliesst es den Reiter — wie in Vim, wo
+   * `:q` das aktuelle Fenster schliesst und erst das letzte den Editor
+   * beendet. Strg+W geht bewusst den anderen Weg und lässt beim letzten
+   * Tab einen leeren stehen: Wer aus dem Browser kommt, erwartet kein
+   * Programmende, wer `:q` tippt, genau das.
    */
   private async quit(force: boolean) {
+    if (this.tabs.length > 1) {
+      await this.closeTab(this.tab.id, force);
+      return;
+    }
+    await this.quitAll(force);
+  }
+
+  /** `:qa` — das Fenster, unabhängig von der Zahl der Tabs. */
+  private async quitAll(force: boolean) {
     const win = getCurrentWindow();
     if (!force) {
       await win.close();
@@ -865,7 +1263,34 @@ class App {
     if (this.commandsOverride) return this.commandsOverride;
 
     return [
-      { id: "file.new", group: "Datei", title: "Neu", shortcut: "Strg+N", run: () => this.newFile() },
+      {
+        id: "tab.new",
+        group: "Tabs",
+        title: "Neuer Tab",
+        shortcut: "Strg+T",
+        run: () => this.newTab(),
+      },
+      {
+        id: "tab.close",
+        group: "Tabs",
+        title: "Tab schliessen",
+        shortcut: "Strg+W",
+        run: () => this.closeTab(this.tab.id),
+      },
+      {
+        id: "tab.next",
+        group: "Tabs",
+        title: "Nächster Tab",
+        shortcut: "Strg+Tab",
+        run: () => this.cycleTab(1),
+      },
+      {
+        id: "tab.prev",
+        group: "Tabs",
+        title: "Voriger Tab",
+        shortcut: "Strg+Umschalt+Tab",
+        run: () => this.cycleTab(-1),
+      },
       {
         id: "file.open",
         group: "Datei",
@@ -1047,6 +1472,10 @@ class App {
           void fn();
         };
 
+        // Vor der Umschalt-Abfrage: Strg+Tab und Strg+Umschalt+Tab sind
+        // dieselbe Bewegung in zwei Richtungen.
+        if (key === "tab") return run(() => this.cycleTab(e.shiftKey ? -1 : 1));
+
         if (e.shiftKey && key === "p") return run(() => this.palette.open());
         if (e.shiftKey && key === "o") return run(() => this.openFileDialog());
         if (e.shiftKey && key === "s") return run(() => this.saveAs());
@@ -1054,9 +1483,22 @@ class App {
         if (e.shiftKey && key === "v") return run(() => this.pasteFromClipboard());
         if (e.shiftKey) return;
 
+        // Strg+1 bis Strg+9 springen an die Stelle im Band; die 9 ans
+        // Ende, wie im Browser — bei zehn Tabs sucht man sonst.
+        if (key >= "1" && key <= "9") {
+          const index = key === "9" ? this.tabs.length - 1 : Number(key) - 1;
+          return run(() => this.activate(index));
+        }
+
         switch (key) {
+          // Strg+N und Strg+T tun dasselbe: Der eine Griff kommt aus dem
+          // Editor, der andere aus dem Browser, und beide meinen denselben
+          // leeren Reiter.
           case "n":
-            return run(() => this.newFile());
+          case "t":
+            return run(() => this.newTab());
+          case "w":
+            return run(() => this.closeTab(this.tab.id));
           case "o":
             return run(() => this.quickOpen.open());
           case "s":
@@ -1091,9 +1533,9 @@ class App {
       event.preventDefault();
 
       await this.saveSession();
-      // Bei aktiver Sitzungswiederherstellung ist der Puffer gesichert,
+      // Bei aktiver Sitzungswiederherstellung sind die Puffer gesichert,
       // eine Rückfrage wäre dann nur im Weg.
-      if (!this.settings.restoreSession && !(await this.confirmDiscard())) return;
+      if (!this.settings.restoreSession && !(await this.confirmUnsaved())) return;
 
       this.closing = true;
       await win.destroy();
@@ -1108,10 +1550,9 @@ class App {
       void readClipboard();
     });
 
-    // Zweite Instanz hat eine Datei weitergereicht.
+    // Zweite Instanz hat Dateien weitergereicht — jede bekommt ihren Tab.
     void listen<string[]>("rui://open-files", (event) => {
-      const [first] = event.payload;
-      if (first) void this.openPath(first);
+      void this.openAll(event.payload);
     });
 
     // Omarchy-Themenwechsel — läuft komplett dateibasiert, kein Neustart nötig.
@@ -1120,12 +1561,31 @@ class App {
     // Datei aufs Fenster ziehen.
     void getCurrentWebviewWindow().onDragDropEvent((event) => {
       if (event.payload.type !== "drop") return;
-      const [first] = event.payload.paths;
-      if (first) void this.openPath(first);
+      void this.openAll(event.payload.paths);
     });
 
     window.addEventListener("beforeunload", () => void this.saveSession());
   }
+}
+
+/**
+ * Ob Rui unter Windows läuft. Der User-Agent des Webviews ist hier die
+ * billigste Auskunft; für die eine Frage, die davon abhängt, lohnt kein
+ * eigener Befehl an die Rust-Seite.
+ */
+const WINDOWS = navigator.userAgent.includes("Windows");
+
+/**
+ * Ob zwei Pfade dieselbe Datei meinen.
+ *
+ * Unter Windows unterscheidet das Dateisystem keine Gross- und
+ * Kleinschreibung, unter Linux schon — dort sind `Log.txt` und `log.txt`
+ * zwei Dateien, und sie in einen Tab zusammenzuwerfen hiesse, die eine
+ * beim Speichern mit der anderen zu überschreiben.
+ */
+function samePath(a: string | null, b: string): boolean {
+  if (!a) return false;
+  return WINDOWS ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
 /** Nur der Dateiname, für Rückfragen, in denen der ganze Pfad stört. */

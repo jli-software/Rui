@@ -68,6 +68,11 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 **Files**
 
+- **Tabs.** Several files open at once, `Ctrl+T` for a new one, `Ctrl+W` to
+  close, `Ctrl+Tab` to cycle, `Ctrl+1`–`Ctrl+9` to jump, middle click to
+  close. Each tab keeps its full editor state — cursor, selection, folds and
+  undo history — so switching back means carrying on, not reopening. The bar
+  stays hidden while a single file is open
 - **Saves only when told to.** `Ctrl+S`, or `:w`. Autosave exists as a
   setting and is off by default — opening a config file to read it must never
   change it
@@ -77,8 +82,11 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 - **Quick Open** on `Ctrl+O` — fuzzy search across your notes folder, any
   extra folders you configure, and the folder of the open file. Newest first,
   build output skipped
-- Warns when another program changes the open file; restores unsaved buffers
-  after a restart
+- Warns when another program changes the open file; restores every open tab
+  after a restart, unsaved buffers included
+- `rui a.ps1 b.ps1`, a multiple selection in the file dialog and a drag and
+  drop of several files all open one tab each. A file that is already open
+  is not opened twice — Rui goes to its tab
 
 **Vim keybindings**
 
@@ -88,6 +96,10 @@ input (`2d`) in the status bar.
 
 `:w`, `:w <name>`, `:wq`, `:x`, `:saveas`, `:e`, `:e!`, `:q`, `:q!` and `:qa`
 go through Rui's own save and open, so encoding and line endings survive them.
+Tabs answer to `:tabnew [file]`, `:tabe`, `:tabn`, `:tabp` and `:tabc`, as
+well as `:bn`, `:bp` and `:bd` — one tab holds exactly one buffer here, so
+both families mean the same thing. `:q` closes the tab and only the last one
+closes the window, the way Vim does it.
 A write reports back in the status bar the way Vim reports in its command
 line — which is where a buffer that got its name on save tells you that name.
 `"+y` and `"+p` reach the system clipboard, as does `Ctrl+Shift+C` /

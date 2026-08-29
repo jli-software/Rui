@@ -6,12 +6,10 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
-### Geplant für 0.3.x
+### Geplant
 - Kürzel in den Einstellungen nicht nur zeigen, sondern umstellen können
 - Vim: `:set number`, `:set wrap` und Verwandtschaft auf Ruis Einstellungen
-
-### Geplant für 0.4
-- Tabs (Puffer-Modell in `types.ts` ist vorbereitet)
+- Tabs umsortieren, Kontextmenü („Andere schliessen", „Rechts schliessen")
 
 ### Geplant, ohne Termin
 - Theming, also frei wählbare Farben
@@ -19,6 +17,65 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.4.0] — 2026-08-29
+
+### Hinzugefügt
+- **Tabs.** Rui hält mehrere Dateien gleichzeitig offen, jede in ihrem
+  Reiter über dem Text. Der Reiter zeigt den Dateinamen, den vollen Pfad im
+  Tooltip und einen Punkt statt des Kreuzes, solange etwas ungespeichert
+  ist.
+
+  | Griff | Wirkung |
+  |---|---|
+  | `Strg+T`, `Strg+N` | neuer Tab |
+  | `Strg+W` | Tab schliessen |
+  | `Strg+Tab`, `Strg+Umschalt+Tab` | einen weiter, einen zurück |
+  | `Strg+1` … `Strg+8` | direkt dorthin |
+  | `Strg+9` | der letzte |
+  | Mittelklick | Tab schliessen |
+
+  Die Leiste bleibt verborgen, solange nur eine Datei offen ist: Wer Rui
+  wie bisher für eine Datei benutzt, bezahlt dafür keine Zeile Höhe.
+- **Jeder Tab behält seinen vollen Editorzustand** — Cursor, Auswahl,
+  Faltung und die Undo-Historie. Zurückwechseln heisst weitermachen und
+  nicht neu öffnen; `Strg+Z` reicht in einem Tab so weit zurück wie vor
+  dem Wechsel.
+- **Vim kennt die Reiter**: `:tabnew [datei]`, `:tabe`, `:tabn`, `:tabp`,
+  `:tabc` sowie `:bn`, `:bp` und `:bd`, die in Rui auf dasselbe zeigen —
+  ein Reiter hält genau einen Puffer. `:q` schliesst wie in Vim den
+  Reiter und erst beim letzten das Fenster; `:qa` beendet immer.
+- **Die Sitzung merkt sich alle Tabs**, nicht mehr nur den zuletzt
+  offenen: Reihenfolge, aktiver Reiter, Cursor, Scrollstand,
+  ungespeicherter Inhalt und eine von Hand gewählte Sprache. Eine
+  Sitzungsdatei aus 0.3.x wird beim ersten Start übernommen und ihr
+  einzelner Puffer zum ersten Tab.
+- **`rui a.ps1 b.ps1` öffnet beide.** Bis 0.3.10 fiel alles ausser der
+  ersten Datei still unter den Tisch — dasselbe galt für mehrere Dateien
+  aus dem Dateimanager, per Drag-and-drop oder über eine zweite Instanz.
+  Der Dateidialog erlaubt jetzt ebenfalls eine Mehrfachauswahl.
+
+### Geändert
+- **Eine bereits offene Datei öffnet sich nicht ein zweites Mal**, Rui
+  springt zu ihrem Reiter. Zwei Tabs auf dieselbe Datei hiessen, dass der
+  eine beim Speichern den anderen überschreibt. Unter Linux entscheidet
+  dabei die Gross- und Kleinschreibung mit, unter Windows nicht — genau
+  wie beim Dateisystem darunter.
+- **`Strg+N` legt einen Tab an, statt den Puffer zu ersetzen.** Der Griff
+  hat damit dieselbe Wirkung wie `Strg+T`; „Neu" heisst mit Reitern nicht
+  mehr „das hier weg".
+- **Eine geöffnete Datei landet in einem neuen Reiter** — aus Quick Open,
+  dem Dateidialog, per Drag-and-drop oder aus einer zweiten Instanz. Nur
+  Vims `:e` ersetzt weiterhin den Puffer im sichtbaren Reiter, wie es das
+  in Vim auch tut. Ist der aktive Reiter leer und unberührt, wird er
+  benutzt statt daneben ein zweiter aufgemacht.
+- **Beim Schliessen eines Reiters wird gefragt**, wenn er Ungespeichertes
+  enthält — auch bei eingeschalteter Sitzungswiederherstellung. Anders als
+  beim Fenster fängt die Sitzung hier nichts auf: Sie merkt sich, was
+  offen ist, und ein geschlossener Reiter ist es nicht mehr.
+- **`Strg+W` auf dem letzten Reiter leert ihn, statt Rui zu beenden.** Wer
+  aus dem Browser kommt, erwartet kein Programmende; wer `:q` tippt, genau
+  das — und bekommt es auch.
 
 ## [0.3.10] — 2026-08-29
 

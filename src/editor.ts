@@ -158,9 +158,35 @@ export class RuiEditor {
 
   /** Setzt Inhalt und Undo-Historie zurück — beim Öffnen einer Datei. */
   loadDocument(content: string) {
+    this.restore(this.freshState(content));
+  }
+
+  /**
+   * Ein frischer Zustand, ohne ihn anzuzeigen — für einen neuen Tab, der
+   * im Hintergrund entsteht.
+   */
+  freshState(content: string): EditorState {
+    return this.buildState(content);
+  }
+
+  /** Der Zustand des sichtbaren Tabs, um ihn beim Wegwechseln aufzuheben. */
+  snapshot(): EditorState {
+    return this.view.state;
+  }
+
+  /**
+   * Zeigt den Zustand eines Tabs wieder an.
+   *
+   * Der Aufrufer muss danach die Compartments nachziehen (`applySettings`,
+   * `applyLanguage`, `applyVimMode`, `setReadOnly`): Ein Zustand, der vor
+   * einer Einstellungsänderung weggelegt wurde, trägt die alte
+   * Konfiguration noch in sich — sonst käme ein Tab ohne Zeilennummern
+   * zurück, nur weil er beim Umschalten gerade nicht sichtbar war.
+   */
+  restore(state: EditorState) {
     this.lastLine = 1;
-    this.view.setState(this.buildState(content));
-    // Der State ist neu, also auch der Vim-Adapter darin.
+    this.view.setState(state);
+    // Der State ist ein anderer, also auch der Vim-Adapter darin.
     this.syncVimStatus();
     this.view.focus();
   }

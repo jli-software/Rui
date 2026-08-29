@@ -70,6 +70,9 @@ const VIM_SHORTCUTS: ShortcutDef[] = [
   { title: "Speichern / schliessen / beides", shortcut: ":w / :q / :wq" },
   { title: "Unter einem Namen speichern", shortcut: ":w name.ps1" },
   { title: "Datei öffnen / neu laden", shortcut: ":e pfad / :e" },
+  { title: "Neuer Tab / mit Datei", shortcut: ":tabnew / :tabnew pfad" },
+  { title: "Nächster / voriger Tab", shortcut: ":tabn / :tabp" },
+  { title: "Tab schliessen / alle beenden", shortcut: ":tabc / :qa" },
   { title: "Schliessen ohne zu speichern", shortcut: ":q!" },
   { title: "In die System-Zwischenablage kopieren / einfügen", shortcut: '"+y / "+p' },
 ];

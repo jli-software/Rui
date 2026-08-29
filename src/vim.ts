@@ -35,8 +35,21 @@ export interface VimHost {
   write: (target?: string) => Promise<boolean>;
   /** `:e <pfad>` — öffnet eine Datei; ohne Argument lädt es die aktuelle neu. */
   edit: (target: string | undefined, force: boolean) => Promise<void>;
-  /** `:q`, mit `!` als `force` — schliesst wie das Fensterkreuz. */
+  /**
+   * `:q`, mit `!` als `force`.
+   *
+   * Wie in Vim: Sind mehrere Tabs offen, schliesst es den aktuellen; beim
+   * letzten schliesst es das Fenster.
+   */
   quit: (force: boolean) => void;
+  /** `:qa` — schliesst das Fenster, egal wie viele Tabs offen sind. */
+  quitAll: (force: boolean) => void;
+  /** `:tabnew [datei]` — ein neuer Reiter, wahlweise mit Datei darin. */
+  tabNew: (target?: string) => void;
+  /** `:tabn` / `:tabp` — einen Reiter weiter oder zurück. */
+  tabCycle: (delta: number) => void;
+  /** `:tabc` / `:bd` — den aktuellen Reiter schliessen. */
+  tabClose: (force: boolean) => void;
 }
 
 /**
@@ -260,7 +273,19 @@ function defineExCommands(host: VimHost) {
   Vim.defineEx("saveas", "sav", (_cm, params) => void host.write(target(params)));
   Vim.defineEx("edit", "e", (_cm, params) => void host.edit(target(params), forced(params)));
   Vim.defineEx("quit", "q", (_cm, params) => host.quit(forced(params)));
-  Vim.defineEx("qall", "qa", (_cm, params) => host.quit(forced(params)));
+  Vim.defineEx("qall", "qa", (_cm, params) => host.quitAll(forced(params)));
+
+  // Tabs. Vim kennt beide Familien — `:tab*` für Reiter, `:b*` für Puffer.
+  // Rui hat pro Reiter genau einen Puffer, also zeigen sie hier auf
+  // dasselbe: Wer das eine tippt, meint auch das andere.
+  Vim.defineEx("tabnew", "tabnew", (_cm, params) => host.tabNew(target(params)));
+  Vim.defineEx("tabedit", "tabe", (_cm, params) => host.tabNew(target(params)));
+  Vim.defineEx("tabnext", "tabn", () => host.tabCycle(1));
+  Vim.defineEx("tabprevious", "tabp", () => host.tabCycle(-1));
+  Vim.defineEx("tabclose", "tabc", (_cm, params) => host.tabClose(forced(params)));
+  Vim.defineEx("bnext", "bn", () => host.tabCycle(1));
+  Vim.defineEx("bprevious", "bp", () => host.tabCycle(-1));
+  Vim.defineEx("bdelete", "bd", (_cm, params) => host.tabClose(forced(params)));
 }
 
 /**

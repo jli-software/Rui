@@ -97,6 +97,117 @@ body[data-decoration="custom"] #titlebar {
   color: #ffffff;
 }
 
+/* ---- Reiterleiste (tabs.ts) ---- */
+
+#tabs {
+  display: flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  height: 30px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Bei einem einzigen Tab bleibt die Leiste weg — wer Rui für eine Datei
+   benutzt, soll dafür keine Zeile Höhe bezahlen. */
+#tabs[hidden] {
+  display: none;
+}
+
+.tabs-list {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs-list::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 200px;
+  padding: 0 6px 0 12px;
+  border-right: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: default;
+}
+
+.tab:hover {
+  background: var(--surface-raised);
+}
+
+/* Der aktive Reiter trägt die Akzentfarbe als Strich oben — nicht als
+   Fläche: Ein farbiger Block neben dem Text zöge mehr Aufmerksamkeit auf
+   die Leiste als auf die Datei darin. */
+.tab.is-active {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tab.is-modified .tab-label {
+  font-style: italic;
+}
+
+.tab-close {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: default;
+}
+
+/* Das Kreuz erscheint erst beim Überfahren; der Punkt für „geändert"
+   steht immer da, sonst sähe ein geänderter Tab aus wie jeder andere. */
+.tab:not(:hover):not(.is-active):not(.is-modified) .tab-close {
+  opacity: 0;
+}
+
+.tab.is-modified .tab-close {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.tab-close:hover {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.tabs-new {
+  flex-shrink: 0;
+  width: 30px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: default;
+}
+
+.tabs-new:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
 .cm-editor {
   height: 100%;
 }

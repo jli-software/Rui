@@ -97,7 +97,8 @@ export interface Settings {
   searchOpenFileFolder: boolean;
 }
 
-export interface Session {
+/** Spiegelt `settings::TabSession` — ein Tab, wie er den Neustart übersteht. */
+export interface TabSession {
   path: string | null;
   unsavedContent: string | null;
   cursor: number;
@@ -106,14 +107,22 @@ export interface Session {
   lineEnding: LineEnding | null;
   bom: boolean;
   createdAtMs: number | null;
+  languageOverride: string | null;
+}
+
+/** Spiegelt `settings::Session` — alle offenen Tabs und der aktive. */
+export interface Session {
+  tabs: TabSession[];
+  active: number;
 }
 
 /**
- * Ein offener Puffer.
+ * Ein offener Puffer — alles, was Rui über die Datei dahinter weiss.
  *
- * Aktuell gibt es immer genau einen davon. Der Zustand ist aber bewusst
- * hier gebündelt statt über Modulvariablen verstreut, damit Tabs später
- * nur eine Liste von Buffers brauchen statt einer Umbau-Aktion.
+ * Seit 0.4.0 hält jeder Tab genau einen davon; was der Editor beim
+ * Wechsel mitbringen muss (CodeMirror-Zustand, Sprache), steht im `Tab`
+ * in `tabs.ts` daneben. Die Trennung hält diesen Typ auf dem, was auch
+ * `document.rs` kennt.
  */
 export interface Buffer {
   path: string | null;
