@@ -20,6 +20,21 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.3.9] — 2026-08-29
+
+### Geändert
+- **Die Release-Seite spricht Englisch.** Titel und Notiz eines Releases
+  kommen jetzt aus der Beschriftung des Tags statt aus dem Changelog: erste
+  Zeile der Titel — der Name der Änderung, zwei bis fünf Wörter, ohne
+  Versionsnummer —, der Rest ein bis drei Sätze dazu. Der ausführliche
+  Changelog bleibt deutsch und hängt als Link unter jeder Release-Notiz.
+  Wer bei GitHub auf Rui stösst, liest dieselbe Sprache wie im README; die
+  Vorgeschichte findet, wer sie sucht.
+- **`CLAUDE.md` und `AGENTS.md` sind nicht mehr eingecheckt.**
+  Arbeitsanweisungen für KI-Agenten gehören zum Arbeitsplatz, nicht ins
+  Produkt — im öffentlichen Repository hätten sie nur den Effekt, dass jeder
+  Fork sie mitschleppt.
+
 ## [0.3.8] — 2026-08-29
 
 ### Behoben
@@ -587,7 +602,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.8...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.9...HEAD
+[0.3.9]: https://github.com/vikingjunior12/Rui/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/vikingjunior12/Rui/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/vikingjunior12/Rui/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/vikingjunior12/Rui/compare/v0.3.5...v0.3.6

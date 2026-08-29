@@ -25,3 +25,10 @@ dist-ssr
 
 # Build-Artefakte: Binaries gehen über GitHub Releases raus, nicht ins Repo
 release/
+
+# Arbeitsanweisungen für KI-Agenten: gehören zum Arbeitsplatz, nicht zum
+# Produkt. Sie liegen lokal und geräteübergreifend im Nextcloud-Memory —
+# im öffentlichen Repo hätten sie nur den Effekt, dass jeder Fork sie erbt.
+CLAUDE.md
+AGENTS.md
+.claude/

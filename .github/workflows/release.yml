@@ -146,45 +146,48 @@ jobs:
           (cd paket && sha256sum *) > SHA256SUMS.txt
           mv SHA256SUMS.txt paket/
 
-          # Der Abschnitt dieser Version aus dem Changelog, ohne die
-          # Vergleichslinks am Dateiende.
-          awk -v ver="$version" '
-            $0 ~ "^## \\[" ver "\\]" { drin = 1; next }
-            drin && /^## \[/ { exit }
-            drin && /^\[.*\]: http/ { exit }
-            drin { print }
-          ' CHANGELOG.md > notiz.md
+          # Titel und Text kommen aus der Beschriftung des Tags: erste Zeile der
+          # Titel, der Rest die Notiz — beides englisch wie das README. Der
+          # ausführliche Changelog bleibt deutsch im Repository; die Release-Seite
+          # ist das Schaufenster nach aussen und nennt nur, was sich geändert hat.
+          #
+          # Die Prüfung auf den Objekttyp ist die Versicherung dagegen, dass sonst
+          # die Commit-Message als Titel über dem Release landet.
+          titel=""
+          text=""
+          if [ "$(git cat-file -t "$tag")" = "tag" ]; then
+            titel="$(git tag -l --format='%(contents:subject)' "$tag")"
+            text="$(git tag -l --format='%(contents:body)' "$tag")"
+          fi
+          [ -n "$titel" ] || titel="Rui $version"
 
-          cat >> notiz.md <<'EOF'
+          if [ -n "$text" ]; then
+            printf '%s\n\n' "$text" > notiz.md
+          else
+            : > notiz.md
+          fi
 
-          ## Installation
+          cat >> notiz.md <<EOF
+          ## Install
 
           **Linux**
 
-          ```bash
+          \`\`\`bash
           curl -fsSL https://raw.githubusercontent.com/vikingjunior12/Rui/main/install.sh | bash
-          ```
+          \`\`\`
 
-          Danach `rui datei.txt` im Terminal und „Rui" im Anwendungsstarter.
-          Wieder weg mit `~/.local/share/rui/install.sh --uninstall` oder
-          demselben Einzeiler mit `| bash -s -- --uninstall`.
+          Then \`rui file.txt\` in a terminal, or *Rui* in the application launcher.
+          Remove it again with \`~/.local/share/rui/install.sh --uninstall\`.
 
           **Windows**
 
-          `rui-setup.exe` für die Installation, `rui.exe` zum blossen Starten,
-          `rui-setup.msi` für Intune und GPO. Die Builds sind nicht signiert,
-          SmartScreen fragt beim ersten Start nach (*Weitere Informationen* →
-          *Trotzdem ausführen*).
-          EOF
+          \`rui-setup.exe\` to install, \`rui.exe\` to just run it, \`rui-setup.msi\` for
+          Intune and GPO. Not code-signed, so SmartScreen warns on first launch
+          (*More info* → *Run anyway*).
 
-          # Beschriftung des Tags als Titel, sonst nur die Versionsnummer.
-          # Die Prüfung auf den Objekttyp ist die Versicherung dagegen, dass
-          # sonst die Commit-Message als Titel über dem Release landet.
-          titel=""
-          if [ "$(git cat-file -t "$tag")" = "tag" ]; then
-            titel="$(git tag -l --format='%(contents:subject)' "$tag")"
-          fi
-          [ -n "$titel" ] || titel="Rui $version"
+          Full changelog (German):
+          https://github.com/${GITHUB_REPOSITORY}/blob/$tag/CHANGELOG.md
+          EOF
 
           gh release create "$tag" \
             --title "$titel" \
