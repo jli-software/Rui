@@ -11,6 +11,7 @@ import { RuiEditor } from "./editor";
 import { refresh as readClipboard, write as writeClipboard } from "./clipboard";
 import { CommandPalette, promptInput, type Command } from "./palette";
 import { QuickOpen } from "./quick-open";
+import { ShortcutsOverlay } from "./shortcuts";
 import { SettingsDialog } from "./settings-ui";
 import { StatusBar } from "./statusbar";
 import { TabBar, tabTitle, type Tab } from "./tabs";
@@ -54,6 +55,7 @@ class App {
   private palette!: CommandPalette;
   private quickOpen!: QuickOpen;
   private settingsDialog!: SettingsDialog;
+  private shortcuts!: ShortcutsOverlay;
   private titlebar!: TitleBar;
   private omarchyAvailable = false;
 
@@ -100,14 +102,24 @@ class App {
     // Der erste Tab hält den Zustand, den der Editor gerade gebaut hat.
     this.tabs = [this.freshTab()];
 
-    this.palette = new CommandPalette(() => this.commands());
+    // Jedes Overlay gibt den Fokus beim Schliessen an den Text zurück.
+    // Ohne das bleibt er im versteckten Dialog hängen, und der nächste
+    // Tastendruck landet nirgendwo — der Editor wirkt dann eingefroren.
+    const backToText = () => this.editor.view.focus();
+
+    this.palette = new CommandPalette(() => this.commands(), backToText);
     this.settingsDialog = new SettingsDialog(
       () => this.settings,
-      () => this.commands(),
       (s) => void this.updateSettings(s),
       () => void this.openSettingsFile(),
       () => void this.resetSettings(),
+      backToText,
     );
+    this.shortcuts = new ShortcutsOverlay({
+      commands: () => this.commands(),
+      vimMode: () => this.settings.vimMode,
+      onClose: backToText,
+    });
     this.quickOpen = new QuickOpen({
       load: () => {
         const folders = this.searchFolders();
@@ -130,6 +142,7 @@ class App {
       onEncoding: () => this.pickEncoding(),
       onLineEnding: () => this.pickLineEnding(),
       onSettings: () => this.settingsDialog.open(),
+      onShortcuts: () => this.shortcuts.toggle(),
     });
     this.tabBar = new TabBar(document.querySelector<HTMLElement>("#tabs")!, {
       onSelect: (id) => void this.activate(this.indexOf(id)),
@@ -1438,6 +1451,13 @@ class App {
         run: () => this.pickLineEnding(),
       },
       {
+        id: "app.shortcuts",
+        group: "Rui",
+        title: "Tastenkürzel…",
+        shortcut: "Strg+K",
+        run: () => this.shortcuts.open(),
+      },
+      {
         id: "app.settings",
         group: "Rui",
         title: "Einstellungen…",
@@ -1461,7 +1481,15 @@ class App {
         const mod = e.ctrlKey || e.metaKey;
         if (!mod) return;
 
-        // Was ein Overlay gerade selbst braucht, bleibt dort.
+        // Was ein Overlay gerade selbst braucht, bleibt dort. Strg+K
+        // schliesst die Kürzelliste allerdings wieder — dieselbe Taste
+        // hin und zurück ist das, was man von einem Spickzettel erwartet.
+        if (this.shortcuts.isOpen) {
+          if (e.key.toLowerCase() !== "k") return;
+          e.preventDefault();
+          this.shortcuts.close();
+          return;
+        }
         if (this.quickOpen.isOpen) return;
         if (this.palette.isOpen && e.key !== ",") return;
 
@@ -1505,6 +1533,12 @@ class App {
             return run(() => this.save());
           case "g":
             return run(() => this.gotoLine());
+          // Strg+K: der Spickzettel. In NeoVim leitet Strg+K im
+          // Einfügemodus ein Digraph ein — ein Griff, den ausserhalb von
+          // „ä als a:" kaum jemand benutzt, während die Frage „wie war das
+          // Kürzel nochmal" täglich kommt.
+          case "k":
+            return run(() => this.shortcuts.open());
           // Strg+I neben Strg+O: die Datei mit dem einen, die Einstellungen
           // mit dem anderen. Beide belegen in Vim die Sprungliste, aber
           // Strg+O geht in Rui seit jeher an Quick Open — dann soll auch

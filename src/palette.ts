@@ -17,24 +17,60 @@ export interface Command {
  * naheliegende Aktion oben steht.
  */
 export function fuzzyScore(needle: string, haystack: string): number {
-  if (!needle) return 1;
-  const n = needle.toLowerCase();
-  const h = haystack.toLowerCase();
+  return fuzzyScoreLower(needle.toLowerCase(), haystack.toLowerCase());
+}
 
-  const direct = h.indexOf(n);
+/**
+ * Dieselbe Bewertung, aber ohne `toLowerCase()` — beide Seiten sind schon
+ * klein geschrieben.
+ *
+ * Der Unterschied ist nicht kosmetisch: Der Dateiöffner bewertet bei jedem
+ * Tastendruck bis zu 20 000 Einträge. Jedes `toLowerCase()` legt dabei eine
+ * neue Zeichenkette an, und zwanzigtausend davon pro Anschlag sind genau
+ * das, was das Tippen zäh gemacht hat. Wer die Kleinschreibung einmal beim
+ * Laden erledigt, zahlt sie nicht mehr pro Zeichen.
+ */
+export function fuzzyScoreLower(needle: string, haystack: string): number {
+  if (!needle) return 1;
+
+  const direct = haystack.indexOf(needle);
   if (direct >= 0) return 1000 - direct;
 
   let hi = 0;
   let points = 0;
   let streak = 0;
-  for (const ch of n) {
-    const found = h.indexOf(ch, hi);
+  for (const ch of needle) {
+    const found = haystack.indexOf(ch, hi);
     if (found < 0) return 0;
     streak = found === hi ? streak + 1 : 0;
     points += 10 + streak * 5 - Math.min(found - hi, 10);
     hi = found + 1;
   }
   return points;
+}
+
+/**
+ * Wo die Zeichen der Eingabe im Text sitzen — für die Hervorhebung in der
+ * Liste. Gleiche Reihenfolge wie die Bewertung oben, damit markiert wird,
+ * was auch gewertet wurde.
+ */
+export function matchRanges(needle: string, haystack: string): [number, number][] {
+  if (!needle) return [];
+
+  const direct = haystack.indexOf(needle);
+  if (direct >= 0) return [[direct, direct + needle.length]];
+
+  const ranges: [number, number][] = [];
+  let hi = 0;
+  for (const ch of needle) {
+    const found = haystack.indexOf(ch, hi);
+    if (found < 0) return [];
+    const last = ranges[ranges.length - 1];
+    if (last && last[1] === found) last[1] = found + 1;
+    else ranges.push([found, found + 1]);
+    hi = found + 1;
+  }
+  return ranges;
 }
 
 export class CommandPalette {
@@ -45,7 +81,18 @@ export class CommandPalette {
   private active = 0;
   private onClose: (() => void) | null = null;
 
-  constructor(private readonly commands: () => Command[]) {
+  /**
+   * `afterClose` läuft nach **jedem** Schliessen, auch nach `Escape`.
+   *
+   * Ohne das blieb der Tastaturfokus im versteckten Dialog hängen: Das
+   * Eingabefeld ist weg, `document.activeElement` fällt auf `<body>` — und
+   * der nächste Tastendruck landet nirgendwo. Wer die Palette wieder
+   * zumachte, tippte danach ins Leere und hielt den Editor für eingefroren.
+   */
+  constructor(
+    private readonly commands: () => Command[],
+    private readonly afterClose?: () => void,
+  ) {
     this.root = document.createElement("div");
     this.root.className = "overlay";
     this.root.hidden = true;
@@ -82,7 +129,10 @@ export class CommandPalette {
   close() {
     if (this.root.hidden) return;
     this.root.hidden = true;
-    this.onClose?.();
+    const done = this.onClose;
+    this.onClose = null;
+    done?.();
+    this.afterClose?.();
   }
 
   private filter() {

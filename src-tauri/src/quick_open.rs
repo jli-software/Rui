@@ -67,14 +67,25 @@ pub struct QuickOpenFile {
 
 /// Durchsucht mehrere Ordner auf einmal.
 ///
-/// Ein einzelner unlesbarer oder verschwundener Ordner darf die Liste nicht
-/// leeren — ein Netzlaufwerk ist mal weg, der Rest bleibt brauchbar. Ein
-/// Fehler kommt nur zurück, wenn sich kein einziger Ordner lesen liess.
+/// `async` und auf einem eigenen Thread: Ein synchroner Befehl läuft in
+/// Tauri auf demselben Thread wie die Oberfläche. Ein Notizordner mit ein
+/// paar tausend Dateien — oder einer auf einem Netzlaufwerk — hat damit das
+/// ganze Fenster angehalten, bis der letzte Unterordner gelesen war. Genau
+/// in dieser Zeit steht der Öffner offen und man will schon tippen.
 #[tauri::command]
-pub fn list_note_files(
+pub async fn list_note_files(
     folders: Vec<String>,
     extensions: Vec<String>,
 ) -> Result<Vec<QuickOpenFile>, String> {
+    tauri::async_runtime::spawn_blocking(move || scan(folders, extensions))
+        .await
+        .map_err(|e| format!("Suche abgebrochen: {e}"))?
+}
+
+/// Ein einzelner unlesbarer oder verschwundener Ordner darf die Liste nicht
+/// leeren — ein Netzlaufwerk ist mal weg, der Rest bleibt brauchbar. Ein
+/// Fehler kommt nur zurück, wenn sich kein einziger Ordner lesen liess.
+fn scan(folders: Vec<String>, extensions: Vec<String>) -> Result<Vec<QuickOpenFile>, String> {
     let wanted: HashSet<String> = extensions
         .into_iter()
         .map(|e| e.trim_start_matches('.').to_ascii_lowercase())
@@ -245,7 +256,7 @@ mod tests {
         fs::write(root.join("Deploy.ps1"), "Write-Host").unwrap();
         fs::write(root.join("bild.png"), "kein Text").unwrap();
 
-        let files = list_note_files(vec![root.to_string_lossy().into_owned()], extensions()).unwrap();
+        let files = scan(vec![root.to_string_lossy().into_owned()], extensions()).unwrap();
         let mut relative: Vec<_> = files.iter().map(|f| f.relative_path.as_str()).collect();
         relative.sort_unstable();
 
@@ -269,7 +280,7 @@ mod tests {
         fs::write(root.join(".git").join("COMMIT_EDITMSG.txt"), "").unwrap();
         fs::write(root.join("Notiz.md"), "").unwrap();
 
-        let files = list_note_files(vec![root.to_string_lossy().into_owned()], extensions()).unwrap();
+        let files = scan(vec![root.to_string_lossy().into_owned()], extensions()).unwrap();
 
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].name, "Notiz.md");
@@ -297,7 +308,7 @@ mod tests {
         fs::write(unten.join("Unten.md"), "").unwrap();
 
         // Der zweite Ordner liegt im ersten, der dritte gibt es gar nicht.
-        let files = list_note_files(
+        let files = scan(
             vec![
                 root.to_string_lossy().into_owned(),
                 unten.to_string_lossy().into_owned(),
@@ -339,8 +350,7 @@ mod tests {
 
     #[test]
     fn fehlender_ordner_liefert_einen_verstaendlichen_fehler() {
-        let err =
-            list_note_files(vec!["definitiv-nicht-vorhanden-rui".to_string()], extensions()).unwrap_err();
+        let err = scan(vec!["definitiv-nicht-vorhanden-rui".to_string()], extensions()).unwrap_err();
         assert!(err.contains("Ordner nicht gefunden"));
     }
 }

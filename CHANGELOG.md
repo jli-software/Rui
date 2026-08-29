@@ -7,7 +7,7 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Geplant
-- Kürzel in den Einstellungen nicht nur zeigen, sondern umstellen können
+- Kürzel nicht nur zeigen, sondern umstellen können
 - Vim: `:set number`, `:set wrap` und Verwandtschaft auf Ruis Einstellungen
 - Tabs umsortieren, Kontextmenü („Andere schliessen", „Rechts schliessen")
 
@@ -17,6 +17,71 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.5.0] — 2026-08-29
+
+### Hinzugefügt
+- **Tastenkürzel-Übersicht auf `Strg+K`**, dazu ein Tastatur-Symbol links
+  neben dem Zahnrad in der Statusleiste. Dieselbe Taste schliesst sie
+  wieder, `Esc` ebenso, und ein Suchfeld filtert die Liste.
+
+  Ist die Vim-Steuerung an, stehen deren Befehle oben und ausführlich da —
+  nach Modus, Bewegen, Bearbeiten, Suchen, Zwischenablage sowie Dateien und
+  Reitern geordnet, an NeoVim ausgerichtet. Die Rui-Kürzel folgen darunter
+  und kommen aus derselben Befehlsliste wie die Palette: Ein neuer Befehl
+  mit Kürzel steht damit ohne Zutun auch hier.
+- **Rui-Kürzel, die eine NeoVim-Bindung verdecken, sagen es jetzt selbst.**
+  Neben `Strg+O`, `Strg+I`, `Strg+F`, `Strg+W`, `Strg+N`, `Strg+T` und
+  `Strg+G` steht in der Übersicht, was dieselbe Taste in NeoVim täte. Die
+  Kürzel bleiben, wie sie sind — Rui ist ein Editor mit Vim-Steuerung, nicht
+  umgekehrt —, aber wer aus NeoVim kommt, greift genau dort daneben.
+- Der Dateiöffner zeigt im Kopf, wie viele Dateien es gibt und wie viele
+  davon die Eingabe trifft, und markiert in jeder Zeile die Zeichen, auf die
+  sie passt.
+
+### Geändert
+- **Der Dateiöffner (`Strg+O`) zeichnet nur noch die sichtbaren Zeilen.**
+  Vorher entstanden bei jedem Tastendruck bis zu 500 Zeilen neu, jede mit
+  vier Kindelementen — bei einem grossen Notizordner war das der Grund,
+  warum sich das Tippen zäh anfühlte. Damit fällt auch die Obergrenze weg:
+  Der zwölftausendste Treffer ist jetzt mit `Ende` genauso erreichbar wie
+  der erste, und die Zeile „… und N weitere" ist überflüssig geworden.
+- **Die Suche arbeitet nur noch mit vorbereiteten Daten.** Klein
+  geschriebene Namen und Pfade entstehen einmal beim Laden statt
+  zwanzigtausendmal pro Anschlag. Verlängert die Eingabe die vorige, wird
+  ausserdem nur noch in deren Treffern gesucht: Was `deplo` nicht enthält,
+  kann `deploy` erst recht nicht enthalten.
+- **Ein Treffer im Dateinamen schlägt jeden Treffer im Pfad.** Wer `deploy`
+  tippt, sucht `deploy.ps1` — nicht die zwölf Dateien im Ordner `deploy/`.
+- **Das Durchsuchen der Ordner läuft nicht mehr auf dem Thread der
+  Oberfläche.** Ein synchroner Tauri-Befehl blockiert das Fenster; ein
+  Notizordner mit ein paar tausend Dateien — oder einer auf einem
+  Netzlaufwerk — liess den Öffner damit erst aufgehen, wenn schon alles
+  gelesen war. Jetzt steht er sofort da, und die zuletzt gelesene Liste ist
+  währenddessen schon zu sehen.
+- **Normal- und Einfügemodus sind endlich auseinanderzuhalten.** Die
+  Plakette unterscheidet nicht mehr nur im Farbton, sondern in der Form:
+  Normal ist leer umrandet und leise, jeder andere Modus ausgefüllt — Grün
+  schreibt, Violett wählt aus, Rot überschreibt. In Omarchy-Themen sind
+  `accent` und `blue` regelmässig **dieselbe** Farbe; die Anzeige wechselte
+  bisher also sichtbar gar nicht, und genau daran tippt man sich in den
+  falschen Modus.
+- Die Tastenkürzel sind aus den Einstellungen verschwunden. Kürzel sind
+  nichts, was man einstellt, sondern etwas, das man mitten in der Arbeit
+  nachschlägt — dafür ist `Strg+K` der richtige Ort, nicht ein Abschnitt
+  drei Bildläufe tief in einem Dialog.
+
+### Behoben
+- **Nach dem Schliessen der Einstellungen oder der Befehlspalette landete
+  der nächste Tastendruck nirgendwo.** Der Fokus blieb im versteckten
+  Dialog hängen, `document.activeElement` fiel auf `<body>` zurück — der
+  Editor wirkte eingefroren, bis man hineinklickte. Wer dabei die
+  Vim-Steuerung eingeschaltet hatte, hielt naheliegenderweise die für
+  kaputt. Jeder Overlay-Schluss gibt den Fokus jetzt an den Text zurück.
+- Im Dateiöffner sprang die Auswahl beim Tippen auf die Zeile unter dem
+  Mauszeiger, auch wenn niemand die Maus bewegt hatte: Unter dem stehenden
+  Zeiger entstanden neue Elemente, und die lösten `mouseenter` aus. Die
+  Auswahl folgt der Maus jetzt nur noch bei echter Bewegung.
 
 ## [0.4.0] — 2026-08-29
 
@@ -670,7 +735,9 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.10...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/vikingjunior12/Rui/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/vikingjunior12/Rui/compare/v0.3.10...v0.4.0
 [0.3.10]: https://github.com/vikingjunior12/Rui/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/vikingjunior12/Rui/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/vikingjunior12/Rui/compare/v0.3.7...v0.3.8

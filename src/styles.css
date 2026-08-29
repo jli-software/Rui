@@ -15,6 +15,13 @@
   --ui-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --radius: 6px;
   --status-height: 26px;
+  /*
+   * Die Zeilenhöhe im Dateiöffner. Sie steht hier, weil `quick-open.ts` sie
+   * ausliest: Die Liste zeichnet nur den sichtbaren Ausschnitt und muss
+   * dafür wissen, wie hoch eine Zeile ist. Eine feste Höhe statt `min-height`
+   * ist deshalb keine Kosmetik, sondern Voraussetzung.
+   */
+  --qo-row: 48px;
 }
 
 html,
@@ -252,33 +259,50 @@ body[data-decoration="custom"] #titlebar {
 }
 
 /*
- * Der Vim-Modus als Plakette. Die Farbe wechselt mit dem Modus, weil man
- * beim Lernen vor allem eines wissen muss: ob der nächste Tastendruck
- * Text schreibt oder einen Befehl auslöst. Insert und Visual borgen sich
- * dafür Farben aus der Syntaxpalette — sie sind in jedem Theme definiert,
- * auch im von Omarchy übernommenen.
+ * Der Vim-Modus als Plakette.
+ *
+ * Beim Lernen — und beim schnellen Blick nach unten auch danach — zählt
+ * genau eine Frage: Schreibt der nächste Tastendruck Text oder löst er
+ * einen Befehl aus? Bis 0.4.0 unterschieden sich Normal und Insert nur
+ * durch die Farbe, und in Omarchy-Themen sind `accent` und `blue`
+ * regelmässig **dieselbe** Farbe — die Plakette wechselte also sichtbar
+ * gar nicht. Genau daran ist man in den falschen Modus getippt.
+ *
+ * Deshalb unterscheidet nicht mehr nur der Farbton, sondern die Form:
+ * Normal ist leer umrandet und leise, jeder andere Modus ist ausgefüllt.
+ * Das trägt auch dann noch, wenn ein Theme zwei Töne fast gleich wählt —
+ * und in einer Graustufen-Ansicht ebenso.
+ *
+ * Die Füllfarben kommen aus der Syntaxpalette und sind gegen `--bg`
+ * gewählt, sind also auch umgedreht lesbar: Kontrast ist symmetrisch.
+ * NeoVims eigene Zuordnung bleibt erhalten — Grün schreibt, Violett wählt
+ * aus, Rot überschreibt.
  */
 .status-vim {
   padding: 1px 6px;
+  border: 1px solid var(--accent);
   border-radius: 4px;
-  background: var(--accent);
-  color: var(--accent-text);
+  background: transparent;
+  color: var(--accent);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.03em;
 }
 
 .status-vim[data-mode="insert"] {
-  background: var(--func);
+  border-color: var(--string);
+  background: var(--string);
   color: var(--bg);
 }
 
 .status-vim[data-mode="visual"] {
-  background: var(--number);
+  border-color: var(--keyword);
+  background: var(--keyword);
   color: var(--bg);
 }
 
 .status-vim[data-mode="replace"] {
+  border-color: var(--danger);
   background: var(--danger);
   color: var(--bg);
 }
@@ -512,6 +536,11 @@ kbd {
   letter-spacing: 0.06em;
 }
 
+.quick-open-count {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .quick-open-head span:first-child {
   min-width: 0;
   overflow: hidden;
@@ -529,12 +558,38 @@ kbd {
 }
 
 .quick-open-list {
+  /* Bezugspunkt für die absolut gesetzten Zeilen. */
+  position: relative;
   max-height: min(58vh, 520px);
 }
 
+/*
+ * Trägt allein die Höhe aller Treffer, auch der ungezeichneten. Ohne ihn
+ * hätte die Liste keinen Bildlauf, weil die sichtbaren Zeilen absolut
+ * positioniert sind und nichts zur Höhe beitragen.
+ */
+.quick-open-sizer {
+  pointer-events: none;
+}
+
 .quick-open-item {
-  min-height: 48px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--qo-row);
   padding-block: 6px;
+}
+
+/* Die Zeichen, auf die die Eingabe passt. */
+.quick-open-item em {
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.quick-open-item.is-active em {
+  color: inherit;
+  text-decoration: underline;
 }
 
 .quick-open-text {
@@ -671,66 +726,104 @@ kbd {
   text-transform: uppercase;
 }
 
-.settings-shortcut-groups {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+/* ---- Tastenkürzel (Strg+K) ---- */
+
+/*
+ * Breiter als die Palette und in Spalten: Die Vim-Liste ist lang, und
+ * Kürzel schlägt man mit den Augen nach, nicht mit dem Bildlauf.
+ */
+.shortcuts {
+  display: flex;
+  width: min(880px, calc(100vw - 48px));
+  max-height: min(78vh, 720px);
+  flex-direction: column;
 }
 
-.settings-shortcut-group {
-  min-width: 0;
+.shortcuts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
 }
 
-.settings-shortcut-group h4 {
-  font-size: 12px;
+.shortcuts-head h2 {
+  font-size: 14px;
   font-weight: 600;
 }
 
-.settings-shortcut-hint {
+.shortcuts-body {
+  display: grid;
+  align-content: start;
+  gap: 6px 28px;
+  padding: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow-y: auto;
+}
+
+.shortcuts-group {
+  min-width: 0;
+  /* Eine Gruppe soll nicht über den Spaltenumbruch zerrissen werden. */
+  break-inside: avoid;
+  margin-bottom: 10px;
+}
+
+.shortcuts-group h3 {
+  margin-bottom: 4px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.shortcuts-hint {
   display: block;
-  min-height: 31px;
-  margin: 2px 0 7px;
+  margin-bottom: 5px;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.4;
 }
 
-.settings-shortcut-row {
+.shortcuts-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 27px;
+  min-height: 26px;
   padding: 3px 0;
   border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
 
-.settings-shortcut-row > span {
+.shortcuts-row > span {
   min-width: 0;
   font-size: 12px;
   line-height: 1.25;
 }
 
-.settings-shortcut-row > span small {
+.shortcuts-row > span small {
   display: block;
   color: var(--muted);
   font-size: 10px;
 }
 
-.settings-shortcut-row kbd {
+.shortcuts-row kbd {
   flex-shrink: 0;
   max-width: 52%;
   text-align: center;
   white-space: normal;
 }
 
-@media (max-width: 620px) {
-  .settings-shortcut-groups {
-    grid-template-columns: 1fr;
-  }
+.shortcuts-empty {
+  padding: 24px 0;
+  color: var(--muted);
+  text-align: center;
+  grid-column: 1 / -1;
+}
 
-  .settings-shortcut-hint {
-    min-height: 0;
+@media (max-width: 720px) {
+  .shortcuts-body {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -936,9 +1029,3 @@ kbd {
   background-clip: content-box;
 }
 
-.quick-open-more {
-  padding: 9px 14px;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 12px;
-}

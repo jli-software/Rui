@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { Command } from "./palette";
 import type { Settings } from "./types";
 
 type FieldDef =
@@ -43,39 +42,6 @@ interface PathStatus {
   folder: string;
   otherFolder: string | null;
 }
-
-interface ShortcutDef {
-  title: string;
-  shortcut: string;
-  group?: string;
-}
-
-/**
- * Das Vim-Paket kennt weit mehr Befehle als in eine Übersicht passen. Hier
- * stehen die Griffe, mit denen man sich bewegen und Rui sicher bedienen
- * kann; Kombinationen wie `d` + Bewegung decken den Rest systematisch ab.
- */
-const VIM_SHORTCUTS: ShortcutDef[] = [
-  { title: "Zum Normalmodus", shortcut: "Esc" },
-  { title: "Vor / nach dem Cursor einfügen", shortcut: "i / a" },
-  { title: "Zeile davor / danach einfügen", shortcut: "O / o" },
-  { title: "Zeichenweise / zeilenweise / blockweise auswählen", shortcut: "v / V / Strg+V" },
-  { title: "Links / unten / oben / rechts", shortcut: "h / j / k / l" },
-  { title: "Wortweise vor / zurück / ans Ende", shortcut: "w / b / e" },
-  { title: "Zeilenanfang / Zeilenende", shortcut: "0 / $" },
-  { title: "Dokumentanfang / Dokumentende", shortcut: "gg / G" },
-  { title: "Löschen / ändern / kopieren", shortcut: "d / c / y + Bewegung" },
-  { title: "Rückgängig / wiederholen", shortcut: "u / Strg+R" },
-  { title: "Suchen / weiter / zurück", shortcut: "/ / n / N" },
-  { title: "Speichern / schliessen / beides", shortcut: ":w / :q / :wq" },
-  { title: "Unter einem Namen speichern", shortcut: ":w name.ps1" },
-  { title: "Datei öffnen / neu laden", shortcut: ":e pfad / :e" },
-  { title: "Neuer Tab / mit Datei", shortcut: ":tabnew / :tabnew pfad" },
-  { title: "Nächster / voriger Tab", shortcut: ":tabn / :tabp" },
-  { title: "Tab schliessen / alle beenden", shortcut: ":tabc / :qa" },
-  { title: "Schliessen ohne zu speichern", shortcut: ":q!" },
-  { title: "In die System-Zwischenablage kopieren / einfügen", shortcut: '"+y / "+p' },
-];
 
 /**
  * Die Einstellungen werden aus dieser Beschreibung erzeugt, nicht von Hand
@@ -298,10 +264,18 @@ export class SettingsDialog {
 
   constructor(
     private current: () => Settings,
-    private readonly commands: () => Command[],
     private readonly onChange: (s: Settings) => void,
     private readonly onOpenFile: () => void,
     private readonly onReset: () => void,
+    /**
+     * Läuft nach jedem Schliessen — auch nach `Escape`.
+     *
+     * Ohne das blieb der Fokus im versteckten Dialog: Das Feld ist weg,
+     * `document.activeElement` fällt auf `<body>`, und der nächste
+     * Tastendruck landet nirgendwo. Wer die Einstellungen zumachte, tippte
+     * danach ins Leere.
+     */
+    private readonly afterClose: () => void,
   ) {
     this.draft = { ...current() };
     this.root = document.createElement("div");
@@ -347,7 +321,9 @@ export class SettingsDialog {
   }
 
   close() {
+    if (this.root.hidden) return;
     this.root.hidden = true;
+    this.afterClose();
   }
 
   /** Neu zeichnen, wenn die Einstellungen von aussen geändert wurden. */
@@ -380,9 +356,6 @@ export class SettingsDialog {
       }
       return el;
     });
-    // Tastatur gehört direkt hinter Eingabe: Die Kürzel sind keine
-    // speicherbare Einstellung, sondern die Bedienungsanleitung dazu.
-    sections.splice(2, 0, this.renderKeyboardSection());
     const system = this.renderSystemSection();
     if (system) sections.push(system);
     body.replaceChildren(...sections);
@@ -570,70 +543,6 @@ export class SettingsDialog {
 
     row.append(labels, button);
     return row;
-  }
-
-  private renderKeyboardSection(): HTMLElement {
-    const section = document.createElement("section");
-    section.className = "settings-section settings-keyboard";
-
-    const heading = document.createElement("h3");
-    heading.textContent = "Tastatur";
-    section.append(heading);
-
-    const groups = document.createElement("div");
-    groups.className = "settings-shortcut-groups";
-
-    const ruiShortcuts: ShortcutDef[] = [
-      { title: "Befehlspalette", shortcut: "Strg+Umschalt+P", group: "Rui" },
-      ...this.commands()
-        .filter((command) => command.shortcut)
-        .map((command) => ({
-          title: command.title.replace(/…$/, ""),
-          shortcut: command.shortcut!,
-          group: command.group,
-        })),
-    ];
-    groups.append(
-      this.renderShortcutGroup("Rui", "Gelten immer, auch bei aktiver Vim-Steuerung.", ruiShortcuts),
-      this.renderShortcutGroup(
-        "Vim",
-        "Gelten im Editor, wenn die Vim-Steuerung unter Eingabe aktiv ist.",
-        VIM_SHORTCUTS,
-      ),
-    );
-    section.append(groups);
-    return section;
-  }
-
-  private renderShortcutGroup(title: string, hint: string, shortcuts: ShortcutDef[]): HTMLElement {
-    const group = document.createElement("div");
-    group.className = "settings-shortcut-group";
-
-    const heading = document.createElement("h4");
-    heading.textContent = title;
-    const description = document.createElement("small");
-    description.className = "settings-shortcut-hint";
-    description.textContent = hint;
-    group.append(heading, description);
-
-    for (const shortcut of shortcuts) {
-      const row = document.createElement("div");
-      row.className = "settings-shortcut-row";
-
-      const label = document.createElement("span");
-      label.textContent = shortcut.title;
-      if (shortcut.group && shortcut.group !== "Rui") {
-        const category = document.createElement("small");
-        category.textContent = shortcut.group;
-        label.prepend(category);
-      }
-
-      const keys = document.createElement("kbd");
-      keys.textContent = shortcut.shortcut;
-      row.append(label, keys);
-      group.append(row);
-    }
-    return group;
   }
 
   private renderField(field: FieldDef): HTMLElement {

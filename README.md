@@ -64,6 +64,8 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 - Find and replace, go to line, undo/redo, bracket matching, auto-indent,
   code folding, line numbers (absolute or relative)
 - Command palette on `Ctrl+Shift+P` instead of a menu bar
+- Shortcut sheet on `Ctrl+K`, searchable, with the Vim commands up front
+  while Vim mode is on
 - Status bar you can click: position, language, encoding, line ending
 
 **Files**
@@ -92,7 +94,9 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 Off by default, switched on in the settings, and loaded only if you use them.
 Normal, insert, visual and replace mode, with the current one and any pending
-input (`2d`) in the status bar.
+input (`2d`) in the status bar. Normal mode reads as an outlined badge and
+every other mode as a filled one, so the mode is legible even where a theme
+happens to give two of them the same hue.
 
 `:w`, `:w <name>`, `:wq`, `:x`, `:saveas`, `:e`, `:e!`, `:q`, `:q!` and `:qa`
 go through Rui's own save and open, so encoding and line endings survive them.
@@ -142,17 +146,20 @@ is automatic: own title bar on Windows, none under a tiling compositor.
 | `Ctrl+N` / `Ctrl+S` / `Ctrl+Shift+S` | New / Save / Save as |
 | `Ctrl+F` / `Ctrl+G` | Find and replace / Go to line |
 | `Ctrl+Shift+C` / `Ctrl+Shift+V` | System clipboard |
+| `Ctrl+T` / `Ctrl+W` / `Ctrl+Tab` | New tab / Close tab / Next tab |
+| `Ctrl+K` | Keyboard shortcuts |
 | `Ctrl+I` | Settings |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | Font size |
 
 With Vim keybindings on, everything Vim binds works in the text area and
-Rui's own `Ctrl` shortcuts keep working alongside it. Full list under
-**Settings → Tastatur**.
+Rui's own `Ctrl` shortcuts keep working alongside it. `Ctrl+K` shows the full
+list — the Vim commands first while Vim mode is on, and a note on every Rui
+shortcut that shadows a NeoVim binding.
 
 ## Not in it
 
-No debugger, no build integration, no LSP, no completion, no terminal. Tabs
-are planned for 0.4. The interface is German only.
+No debugger, no build integration, no LSP, no completion, no terminal. The
+interface is German only.
 
 ## Build
 

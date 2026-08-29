@@ -15,6 +15,7 @@ export interface StatusActions {
   onLanguage: () => void;
   onPosition: () => void;
   onSettings: () => void;
+  onShortcuts: () => void;
 }
 
 const LINE_ENDING_LABEL = { lf: "LF", crlf: "CRLF", cr: "CR" } as const;
@@ -34,6 +35,22 @@ const GEAR_SVG = `
     <path d="M8 3.6V1.5M8 12.4v2.1M3.6 8H1.5M12.4 8h2.1
              M4.89 4.89 3.4 3.4M11.11 11.11l1.49 1.49
              M11.11 4.89 12.6 3.4M4.89 11.11 3.4 12.6" />
+  </svg>`;
+
+/**
+ * Tastatur, ebenfalls selbst gezeichnet: ein Rahmen mit drei Reihen Tasten
+ * als Punkte und einer Leertaste darunter. Bei 14 px trägt ein Symbol nur
+ * wenige Striche — diese Silhouette bleibt auch dann noch erkennbar als
+ * das, was sie meint, und passt in Strichstärke und Rundung zum Zahnrad
+ * daneben.
+ */
+const KEYBOARD_SVG = `
+  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"
+       stroke-width="1.3" stroke-linecap="round" aria-hidden="true">
+    <rect x="1.2" y="3.4" width="13.6" height="9.2" rx="1.6" />
+    <path d="M4 6h0M6.5 6h0M9 6h0M11.5 6h0M4 8.4h0M6.5 8.4h0M9 8.4h0M11.5 8.4h0"
+          stroke-width="1.6" />
+    <path d="M5 10.8h6" />
   </svg>`;
 
 /**
@@ -60,6 +77,7 @@ export class StatusBar {
   /** Angefangene Vim-Eingabe, etwa `2d` — beim Lernen die halbe Miete. */
   private readonly pending: HTMLSpanElement;
   private readonly settings: HTMLButtonElement;
+  private readonly shortcuts: HTMLButtonElement;
   /** Kurzmeldung nach einer Aktion, etwa `"notiz.md" geschrieben`. */
   private readonly message: HTMLSpanElement;
   private messageTimer: number | undefined;
@@ -80,6 +98,9 @@ export class StatusBar {
         <button class="status-btn status-eol" title="Zeilenende wählen"></button>
         <span class="status-divider"></span>
         <div class="status-tools">
+          <button class="status-icon status-shortcuts" title="Tastenkürzel (Strg+K)" aria-label="Tastenkürzel">
+            ${KEYBOARD_SVG}
+          </button>
           <button class="status-icon status-settings" title="Einstellungen (Strg+I)" aria-label="Einstellungen">
             ${GEAR_SVG}
           </button>
@@ -95,6 +116,7 @@ export class StatusBar {
     this.vim = root.querySelector(".status-vim")!;
     this.pending = root.querySelector(".status-pending")!;
     this.settings = root.querySelector(".status-settings")!;
+    this.shortcuts = root.querySelector(".status-shortcuts")!;
     this.message = root.querySelector(".status-message")!;
 
     this.position.addEventListener("click", actions.onPosition);
@@ -102,6 +124,7 @@ export class StatusBar {
     this.encoding.addEventListener("click", actions.onEncoding);
     this.lineEnding.addEventListener("click", actions.onLineEnding);
     this.settings.addEventListener("click", actions.onSettings);
+    this.shortcuts.addEventListener("click", actions.onShortcuts);
   }
 
   update(
@@ -168,6 +191,6 @@ export class StatusBar {
     this.vim.dataset.mode = status.mode.split(" ")[0];
     this.vim.title = status.pending
       ? `Vim — angefangen: ${status.pending}`
-      : "Vim-Steuerung aktiv";
+      : `Vim-Steuerung aktiv — ${status.mode}`;
   }
 }
