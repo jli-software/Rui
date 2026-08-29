@@ -20,6 +20,16 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.3.8] — 2026-08-29
+
+### Behoben
+- **Über dem Release stand die Commit-Message statt des Tag-Titels.**
+  `actions/checkout` legt den Tag im Klon als blosses Etikett auf dem Commit
+  an, ohne das annotierte Objekt dahinter — `%(contents:subject)` greift dann
+  auf die Commit-Message durch, und die beschreibt den letzten Handgriff, nicht
+  die Version. Der Release-Auftrag holt das Tag-Objekt jetzt nach und prüft,
+  dass es eines ist, bevor er dessen Beschriftung als Titel nimmt.
+
 ## [0.3.7] — 2026-08-29
 
 ### Hinzugefügt
@@ -577,7 +587,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.7...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/vikingjunior12/Rui/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/vikingjunior12/Rui/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/vikingjunior12/Rui/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/vikingjunior12/Rui/compare/v0.3.4...v0.3.5

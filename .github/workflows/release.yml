@@ -106,6 +106,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # checkout legt den Tag als blosses Etikett auf dem Commit an, ohne das
+      # annotierte Objekt dahinter — `contents:subject` griffe dann auf die
+      # Commit-Message durch und die stünde als Titel über dem Release.
+      - name: Tag-Objekt nachholen
+        run: git fetch --tags --force origin
+
       # Nicht nach `assets/` — so heisst im Repository schon der Ordner mit
       # Logo und Screenshots, und der landete dann mit im Release.
       - uses: actions/download-artifact@v5
@@ -172,7 +178,12 @@ jobs:
           EOF
 
           # Beschriftung des Tags als Titel, sonst nur die Versionsnummer.
-          titel="$(git tag -l --format='%(contents:subject)' "$tag")"
+          # Die Prüfung auf den Objekttyp ist die Versicherung dagegen, dass
+          # sonst die Commit-Message als Titel über dem Release landet.
+          titel=""
+          if [ "$(git cat-file -t "$tag")" = "tag" ]; then
+            titel="$(git tag -l --format='%(contents:subject)' "$tag")"
+          fi
           [ -n "$titel" ] || titel="Rui $version"
 
           gh release create "$tag" \
