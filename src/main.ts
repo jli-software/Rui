@@ -2,12 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { open as openDialog, save as saveDialog, ask, message } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { openSearchPanel } from "@codemirror/search";
 import { undo, redo } from "@codemirror/commands";
 
 import { AboutDialog } from "./about";
+import { alertDialog, confirmDialog, dialog, dialogOpen } from "./dialog";
 import { RuiEditor } from "./editor";
 import { refresh as readClipboard, write as writeClipboard } from "./clipboard";
 import { CommandPalette, promptInput, type Command } from "./palette";
@@ -18,6 +19,7 @@ import { StatusBar } from "./statusbar";
 import { TabBar, tabTitle, type Tab } from "./tabs";
 import { TitleBar } from "./titlebar";
 import { omarchyPalette, sageDark, sageLight } from "./theme";
+import type { VimOption } from "./vim";
 import {
   LANGUAGES,
   detectLanguage,
@@ -32,6 +34,7 @@ import type {
   LoadedDocument,
   OmarchyColors,
   QuickOpenFile,
+  RenameResult,
   ResolvedDecoration,
   Session,
   Settings,
@@ -50,6 +53,26 @@ const ENCODINGS = ["UTF-8", "windows-1252", "ISO-8859-1", "UTF-16LE", "UTF-16BE"
  * `:e` es tut.
  */
 type OpenTarget = "tab" | "current";
+
+/**
+ * Welche Einstellung hinter welcher `:set`-Option steckt.
+ *
+ * Die Namen sind Vims, die Werte Ruis — und dass beide Seiten dieselbe
+ * Sache meinen, steht damit an genau einer Stelle.
+ */
+const VIM_OPTIONS: Record<VimOption, keyof Settings> = {
+  wrap: "wordWrap",
+  number: "lineNumbers",
+  relativenumber: "relativeLineNumbers",
+};
+
+/** Die drei Ausgänge der Rückfrage vor dem Verwerfen. */
+type UnsavedAnswer = "save" | "discard" | "cancel";
+
+/** Der Satz, der über jeder dieser Rückfragen steht. */
+function unsavedText(name: string): string {
+  return `„${name}" enthält Änderungen, die noch nicht auf der Platte stehen.`;
+}
 
 class App {
   private editor!: RuiEditor;
@@ -98,6 +121,8 @@ class App {
         tabNew: (target) => void this.edit(target, false, "tab"),
         tabCycle: (delta) => void this.cycleTab(delta),
         tabClose: (force) => void this.closeTab(this.tab.id, force),
+        readOption: (name) => Boolean(this.settings[VIM_OPTIONS[name]]),
+        writeOption: (name, value) => void this.setVimOption(name, value),
       },
     );
 
@@ -156,6 +181,7 @@ class App {
       onSelect: (id) => void this.activate(this.indexOf(id)),
       onClose: (id) => void this.closeTab(id),
       onNew: () => void this.newTab(),
+      onRename: (id, name) => void this.renameTab(id, name),
     });
     this.titlebar = new TitleBar(document.querySelector<HTMLElement>("#titlebar")!);
 
@@ -346,21 +372,20 @@ class App {
    * bei eingeschalteter Sitzungswiederherstellung gefragt.
    */
   private async closeTab(id: number, force = false): Promise<boolean> {
-    const index = this.indexOf(id);
+    let index = this.indexOf(id);
     if (index < 0) return false;
     const tab = this.tabs[index];
 
     if (!force && this.settings.confirmOnClose && this.isModifiedTab(tab)) {
-      const discard = await ask(
-        `"${tabTitle(tab)}" enthält ungespeicherte Änderungen. Verwerfen?`,
-        {
-          title: "Tab schliessen",
-          kind: "warning",
-          okLabel: "Verwerfen",
-          cancelLabel: "Abbrechen",
-        },
-      );
-      if (!discard) return false;
+      // Erst hinsehen lassen, dann fragen: Beim Mittelklick auf einen
+      // Reiter daneben stünde die Frage sonst über einer Datei, die gar
+      // nicht auf dem Bildschirm ist.
+      if (tab !== this.tab) await this.activate(index);
+      const answer = await this.askUnsaved(unsavedText(tabTitle(tab)));
+      if (answer === "cancel") return false;
+      if (answer === "save" && !(await this.save())) return false;
+      index = this.indexOf(id);
+      if (index < 0) return false;
     }
 
     // Der letzte Tab wird geleert statt geschlossen: Rui ohne Puffer gibt
@@ -392,6 +417,49 @@ class App {
     this.activeIndex = Math.min(index, this.tabs.length - 1);
     await this.show();
     return true;
+  }
+
+  /**
+   * Benennt die Datei eines Reiters um — auf der Platte, nicht nur im
+   * Reiter.
+   *
+   * Ein Etikett, das anders heisst als die Datei darunter, wäre genau die
+   * Sorte Anzeige, der man nicht trauen kann. Der Ordner bleibt dabei
+   * derselbe; wer verschieben will, nimmt „Speichern unter".
+   *
+   * Ein Puffer ohne Datei bekommt mit dem Namen zugleich seinen Ort — das
+   * ist derselbe Weg wie `:w <name>`, und der Notizen-Ordner ist der, den
+   * ein namenloser Puffer ohnehin bekäme.
+   */
+  private async renameTab(id: number, name: string) {
+    const index = this.indexOf(id);
+    if (index < 0) return;
+    // Umbenannt wird nur, was auch sichtbar ist: `setLanguage` und das
+    // Speichern arbeiten beide auf dem aktiven Reiter.
+    await this.activate(index);
+    const tab = this.tab;
+    const path = tab.buffer.path;
+
+    if (!path) {
+      if (this.settings.notesFolder) await this.saveTo(name);
+      else await this.saveAs(name);
+      return;
+    }
+
+    try {
+      const renamed = await invoke<RenameResult>("rename_file", { path, name });
+      tab.buffer.path = renamed.path;
+      // Die neue `mtime` muss mit: Sonst hält die Prüfung auf fremde
+      // Änderungen die eigene Umbenennung für einen fremden Zugriff und
+      // fragt beim nächsten Fokuswechsel, ob neu geladen werden soll.
+      tab.buffer.mtimeMs = renamed.mtimeMs;
+      if (!tab.languageOverride) await this.setLanguage(detectLanguage(renamed.path));
+      this.status.flash(`Umbenannt in „${shortName(renamed.path)}"`);
+    } catch (err) {
+      await alertDialog(String(err), { title: "Umbenennen fehlgeschlagen" });
+    }
+    this.refreshStatus();
+    this.scheduleSessionSave();
   }
 
   private emptyBuffer(): Buffer {
@@ -462,14 +530,36 @@ class App {
 
   // ---- Dateien ----------------------------------------------------------
 
+  /**
+   * Die Rückfrage vor dem Verwerfen — Ruis eigener Dialog, nicht der des
+   * Systems.
+   *
+   * Drei Antworten, nicht zwei: Ein System-Dialog kann nur „verwerfen oder
+   * abbrechen" fragen, und wer eigentlich speichern wollte, musste
+   * abbrechen, `Strg+S` drücken und noch einmal schliessen. Enter liegt
+   * auf „Speichern", Esc auf „Abbrechen" — beide Tasten tun damit das,
+   * was nichts vernichtet.
+   */
+  private askUnsaved(text: string, saveLabel = "Speichern"): Promise<UnsavedAnswer> {
+    return dialog<UnsavedAnswer>({
+      title: "Ungespeicherte Änderungen",
+      text,
+      kind: "warning",
+      actions: [
+        { label: saveLabel, value: "save", tone: "primary" },
+        { label: "Verwerfen", value: "discard", tone: "danger" },
+        { label: "Abbrechen", value: "cancel" },
+      ],
+      dismiss: "cancel",
+    });
+  }
+
   private async confirmDiscard(): Promise<boolean> {
     if (!this.isModified || !this.settings.confirmOnClose) return true;
-    return ask(`"${this.fileName}" enthält ungespeicherte Änderungen. Verwerfen?`, {
-      title: "Rui",
-      kind: "warning",
-      okLabel: "Verwerfen",
-      cancelLabel: "Abbrechen",
-    });
+    const answer = await this.askUnsaved(unsavedText(this.fileName));
+    if (answer === "cancel") return false;
+    if (answer === "save") return this.save();
+    return true;
   }
 
   /** Mehrere Dateien nacheinander öffnen — jede in ihrem Tab. */
@@ -490,14 +580,26 @@ class App {
     const names = dirty.map((tab) => `„${tabTitle(tab)}"`).join(", ");
     const text =
       dirty.length === 1
-        ? `${names} enthält ungespeicherte Änderungen. Verwerfen?`
-        : `${dirty.length} Tabs enthalten ungespeicherte Änderungen (${names}). Verwerfen?`;
-    return ask(text, {
-      title: "Rui",
-      kind: "warning",
-      okLabel: "Verwerfen",
-      cancelLabel: "Abbrechen",
-    });
+        ? unsavedText(tabTitle(dirty[0]))
+        : `${dirty.length} Tabs enthalten Änderungen, die noch nicht auf der Platte stehen: ${names}.`;
+    const answer = await this.askUnsaved(
+      text,
+      dirty.length === 1 ? "Speichern" : "Alle speichern",
+    );
+    if (answer === "cancel") return false;
+    if (answer === "discard") return true;
+
+    // Jeder Tab wird sichtbar gemacht, bevor er geschrieben wird: Speichern
+    // arbeitet auf dem Editor, und der zeigt immer nur einen Puffer. Bricht
+    // einer ab — etwa weil der Dateidialog geschlossen wird —, bleibt das
+    // Fenster offen, statt den Rest stillschweigend zu verlieren.
+    for (const tab of dirty) {
+      const index = this.indexOf(tab.id);
+      if (index < 0) continue;
+      await this.activate(index);
+      if (!(await this.save())) return false;
+    }
+    return true;
   }
 
   private async openFileDialog() {
@@ -570,13 +672,13 @@ class App {
       const large = text.match(/^LARGE_FILE:(\d+)$/);
       if (large) {
         const mb = (Number(large[1]) / 1024 / 1024).toFixed(1);
-        const proceed = await ask(
+        const proceed = await confirmDialog(
           `Diese Datei ist ${mb} MB gross. Rui ist auf Snippets ausgelegt und wird damit spürbar langsamer. Trotzdem öffnen?`,
-          { title: "Grosse Datei", kind: "warning", okLabel: "Öffnen" },
+          { title: "Grosse Datei", okLabel: "Öffnen" },
         );
         return proceed ? this.readDocument(path, true) : null;
       }
-      await message(text, { title: "Öffnen fehlgeschlagen", kind: "error" });
+      await alertDialog(text, { title: "Öffnen fehlgeschlagen" });
       return null;
     }
   }
@@ -622,18 +724,17 @@ class App {
         fallback: this.settings.notesFolder,
       });
     } catch (err) {
-      await message(String(err), { title: "Speichern fehlgeschlagen", kind: "error" });
+      await alertDialog(String(err), { title: "Speichern fehlgeschlagen" });
       return false;
     }
 
     // Eine fremde Datei nicht wortlos überschreiben — `:w!` gibt es in Rui
     // (noch) nicht, also fragt Rui stattdessen.
     if (path !== this.buffer.path && (await this.exists(path))) {
-      const overwrite = await ask(`"${shortName(path)}" gibt es bereits. Überschreiben?`, {
-        title: "Speichern",
-        kind: "warning",
-        okLabel: "Überschreiben",
-      });
+      const overwrite = await confirmDialog(
+        `„${shortName(path)}" gibt es bereits. Überschreiben?`,
+        { title: "Speichern", okLabel: "Überschreiben", danger: true },
+      );
       if (!overwrite) return false;
     }
 
@@ -683,14 +784,14 @@ class App {
       if (!this.tab.languageOverride) await this.setLanguage(detectLanguage(result.path));
       return true;
     } catch (err) {
-      await message(String(err), { title: "Speichern fehlgeschlagen", kind: "error" });
+      await alertDialog(String(err), { title: "Speichern fehlgeschlagen" });
       return false;
     }
   }
 
-  private async saveAs(): Promise<boolean> {
+  private async saveAs(suggestion?: string): Promise<boolean> {
     const target = await saveDialog({
-      defaultPath: this.buffer.path ?? this.fileName,
+      defaultPath: suggestion ?? this.buffer.path ?? this.fileName,
       filters: dialogFilters(),
     });
     if (!target) return false;
@@ -726,7 +827,7 @@ class App {
         fallback: this.settings.notesFolder,
       });
     } catch (err) {
-      await message(String(err), { title: "Öffnen fehlgeschlagen", kind: "error" });
+      await alertDialog(String(err), { title: "Öffnen fehlgeschlagen" });
       return;
     }
 
@@ -775,9 +876,8 @@ class App {
       const text = String(err);
       // Encoding kann den Text nicht darstellen: UTF-8 anbieten.
       if (text.includes("nicht darstellen kann")) {
-        const useUtf8 = await ask(text, {
+        const useUtf8 = await confirmDialog(text, {
           title: "Encoding",
-          kind: "warning",
           okLabel: "Als UTF-8 speichern",
         });
         if (useUtf8) {
@@ -786,7 +886,7 @@ class App {
         }
         return false;
       }
-      await message(text, { title: "Speichern fehlgeschlagen", kind: "error" });
+      await alertDialog(text, { title: "Speichern fehlgeschlagen" });
       return false;
     }
   }
@@ -824,11 +924,16 @@ class App {
     // Erst merken, sonst fragt der nächste Fokuswechsel gleich nochmal.
     this.buffer.mtimeMs = mtime;
 
-    const reload = await ask(
+    const reload = await confirmDialog(
       this.isModified
-        ? `"${this.fileName}" wurde ausserhalb von Rui geändert. Neu laden und die eigenen Änderungen verwerfen?`
-        : `"${this.fileName}" wurde ausserhalb von Rui geändert. Neu laden?`,
-      { title: "Datei geändert", kind: "warning", okLabel: "Neu laden", cancelLabel: "Behalten" },
+        ? `„${this.fileName}" wurde ausserhalb von Rui geändert. Neu laden und die eigenen Änderungen verwerfen?`
+        : `„${this.fileName}" wurde ausserhalb von Rui geändert. Neu laden?`,
+      {
+        title: "Datei geändert",
+        okLabel: "Neu laden",
+        cancelLabel: "Behalten",
+        danger: this.isModified,
+      },
     );
     if (reload) await this.openPath(this.buffer.path, { force: true, where: "current" });
   }
@@ -1062,14 +1167,15 @@ class App {
     try {
       await invoke("save_settings", { settings: next });
     } catch (err) {
-      await message(String(err), { title: "Einstellungen", kind: "error" });
+      await alertDialog(String(err), { title: "Einstellungen" });
     }
   }
 
   private async resetSettings() {
-    const sure = await ask("Alle Einstellungen auf den Standard zurücksetzen?", {
+    const sure = await confirmDialog("Alle Einstellungen auf den Standard zurücksetzen?", {
       title: "Einstellungen",
       okLabel: "Zurücksetzen",
+      danger: true,
     });
     if (!sure) return;
     // Eine leere Datei bedeutet: überall greifen die Defaults aus dem Code.
@@ -1296,6 +1402,43 @@ class App {
     this.editor.view.focus();
   }
 
+  /**
+   * Umbenennen über Tastatur und Palette.
+   *
+   * Der Doppelklick im Reiter ist der eine Weg, das hier der andere — und
+   * bei einer einzigen offenen Datei sogar der einzige: Die Reiterleiste
+   * ist dann verborgen, es gibt also gar nichts, worauf man klicken
+   * könnte.
+   */
+  private async renamePrompt() {
+    const before = tabTitle(this.tab);
+    const answer = await promptInput("Umbenennen in", before);
+    const name = answer?.trim();
+    if (name && name !== before) await this.renameTab(this.tab.id, name);
+    this.editor.view.focus();
+  }
+
+  /**
+   * `:set wrap` und Verwandtschaft.
+   *
+   * Der Weg geht durch `updateSettings`, nicht am Editor vorbei: Was `:set`
+   * umlegt, steht danach auch im Einstellungsdialog und überlebt den
+   * Neustart — eine Option, die nur bis zum Schliessen gilt, wäre in einem
+   * Editor mit gespeicherten Einstellungen die Überraschung.
+   */
+  private async setVimOption(name: VimOption, value: boolean) {
+    const key = VIM_OPTIONS[name];
+    const next: Settings = { ...this.settings, [key]: value };
+    // Relative Nummern ohne Nummernspalte wären unsichtbar — `:set rnu`
+    // schaltet sie deshalb gleich mit ein, wie Vim es tut.
+    if (name === "relativenumber" && value) next.lineNumbers = true;
+    if (next[key] === this.settings[key] && next.lineNumbers === this.settings.lineNumbers) {
+      return;
+    }
+    await this.updateSettings(next);
+    this.status.flash(`:set ${value ? "" : "no"}${name}`);
+  }
+
   private async gotoLine() {
     const answer = await promptInput("Gehe zu Zeile", "");
     const line = Number(answer);
@@ -1374,6 +1517,13 @@ class App {
         title: "Speichern unter…",
         shortcut: "Strg+Umschalt+S",
         run: () => this.saveAs(),
+      },
+      {
+        id: "file.rename",
+        group: "Datei",
+        title: "Umbenennen…",
+        shortcut: "F2",
+        run: () => this.renamePrompt(),
       },
       {
         id: "file.autosave",
@@ -1555,6 +1705,12 @@ class App {
     window.addEventListener(
       "keydown",
       (e) => {
+        // Ein offener Dialog und ein Reiter, dessen Name gerade bearbeitet
+        // wird, haben die Tastatur für sich. Der Haken hängt mit `capture`
+        // am Fenster und käme sonst zuerst dran — `Strg+W` schlösse also
+        // den Reiter, dessen Schliessen gerade zur Debatte steht.
+        if (dialogOpen() || this.tabBar.isRenaming) return;
+
         const mod = e.ctrlKey || e.metaKey;
         const overlayOpen = this.shortcuts.isOpen || this.quickOpen.isOpen || this.about.isOpen;
 
@@ -1573,6 +1729,16 @@ class App {
           // den Bildschirm, statt zu tippen.
           e.stopPropagation();
           void this.toggleWordWrap();
+          return;
+        }
+
+        // F2 benennt um — der Griff aus jedem Dateimanager, und der
+        // einzige, der auch bei verborgener Reiterleiste zu erreichen ist.
+        if (e.key === "F2" && !mod && !e.altKey && !e.shiftKey) {
+          if (overlayOpen || this.palette.isOpen) return;
+          e.preventDefault();
+          e.stopPropagation();
+          void this.renamePrompt();
           return;
         }
 

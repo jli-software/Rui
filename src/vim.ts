@@ -21,6 +21,16 @@ export interface VimStatus {
 }
 
 /**
+ * Die `:set`-Optionen, die Rui kennt.
+ *
+ * Sie heissen wie in Vim und zeigen auf Ruis Einstellungen — wer `:set
+ * nowrap` tippt, meint denselben Zeilenumbruch, den auch `Alt+Z` und der
+ * Einstellungsdialog umlegen. Alles andere, was `:set` in Vim kann,
+ * bleibt beim Vim-Paket: `:set ignorecase` etwa geht weiter dorthin.
+ */
+export type VimOption = "wrap" | "number" | "relativenumber";
+
+/**
  * Was `:w`, `:e` und `:q` auslösen sollen. Zeigt bewusst auf Ruis eigene
  * Wege und nicht auf die des Vim-Pakets.
  */
@@ -50,6 +60,10 @@ export interface VimHost {
   tabCycle: (delta: number) => void;
   /** `:tabc` / `:bd` — den aktuellen Reiter schliessen. */
   tabClose: (force: boolean) => void;
+  /** Der aktuelle Stand einer `:set`-Option — für `:set wrap?`. */
+  readOption: (name: VimOption) => boolean;
+  /** `:set wrap` / `:set nowrap` / `:set wrap!`. */
+  writeOption: (name: VimOption, value: boolean) => void;
 }
 
 /**
@@ -77,6 +91,7 @@ export function vimExtension(host: VimHost): Extension {
   if (!vimGlobalsDefined) {
     vimGlobalsDefined = true;
     defineExCommands(host);
+    defineOptions(host);
     defineClipboardRegisters();
   }
   return [vim(), cursorTheme];
@@ -286,6 +301,35 @@ function defineExCommands(host: VimHost) {
   Vim.defineEx("bnext", "bn", () => host.tabCycle(1));
   Vim.defineEx("bprevious", "bp", () => host.tabCycle(-1));
   Vim.defineEx("bdelete", "bd", (_cm, params) => host.tabClose(forced(params)));
+}
+
+/**
+ * `:set wrap` und Verwandtschaft an Ruis Einstellungen hängen.
+ *
+ * Über `defineOption` statt über einen eigenen `:set`-Ex-Befehl: Ein
+ * eigener `:set` würde den des Pakets ersetzen, und damit fiele alles
+ * andere weg, was Vim darunter kennt — `:set ignorecase` etwa. So kommt
+ * nur der Name dazu, der Rest bleibt, wo er war. Die Schreibweisen `no…`,
+ * `…!` und `…?` bringt das Paket von selbst mit, ebenso die Kurznamen.
+ */
+function defineOptions(host: VimHost) {
+  const boolean = (name: VimOption, aliases: string[]) => {
+    // Ohne Vorgabewert: `defineOption` würde ihn sonst sofort setzen und
+    // damit Ruis Einstellung beim Laden des Moduls überschreiben.
+    Vim.defineOption(name, undefined, "boolean", aliases, (value, cm) => {
+      // Ohne Wert ist es ein `:set wrap?`, also eine Frage.
+      if (value === undefined) return host.readOption(name);
+      // Das Paket ruft den Rückruf zweimal, einmal global und einmal für
+      // den Editor. Rui kennt nur eine Einstellung, also zählt der erste.
+      if (cm !== undefined) return;
+      host.writeOption(name, value);
+      return value;
+    });
+  };
+
+  boolean("wrap", []);
+  boolean("number", ["nu"]);
+  boolean("relativenumber", ["rnu"]);
 }
 
 /**

@@ -407,6 +407,73 @@ pub fn file_mtime(path: String) -> Result<u64, String> {
     Ok(mtime_ms(&p))
 }
 
+/// Ergebnis des Umbenennens: der neue Pfad und die Zeit, die die Datei
+/// danach trägt.
+///
+/// Die `mtime` muss mit zurück, sonst hält Ruis Prüfung auf fremde
+/// Änderungen die eigene Umbenennung für einen fremden Zugriff und fragt,
+/// ob neu geladen werden soll.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Renamed {
+    pub path: String,
+    pub mtime_ms: u64,
+}
+
+/// Benennt eine Datei im selben Ordner um.
+///
+/// `name` ist ein reiner Dateiname, kein Pfad: Umbenennen im Reiter soll
+/// die Datei nicht heimlich verschieben können — wer sie woanders haben
+/// will, nimmt „Speichern unter". Ein bestehendes Ziel wird nicht
+/// überschrieben; das ist der Fall, in dem ein Vertipper sonst zwei
+/// Dateien zu einer macht.
+#[tauri::command]
+pub fn rename_file(path: String, name: String) -> Result<Renamed, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("Der Name darf nicht leer sein.".to_string());
+    }
+    if name.contains(['/', '\\']) || Path::new(name).components().count() != 1 {
+        return Err("Der Name darf keinen Pfad enthalten.".to_string());
+    }
+    // Windows lehnt diese Zeichen im Dateinamen ab; unter Linux wären sie
+    // erlaubt, aber eine Datei mit `?` im Namen ist auch dort niemandes
+    // Absicht — und Rui-Dateien wandern zwischen beiden Systemen.
+    if name.contains(['<', '>', ':', '"', '|', '?', '*']) {
+        return Err("Im Namen sind < > : \" | ? * nicht erlaubt.".to_string());
+    }
+
+    let source = PathBuf::from(&path);
+    if !source.exists() {
+        return Err(format!("{path}: Datei nicht gefunden."));
+    }
+    let folder = source
+        .parent()
+        .ok_or_else(|| format!("{path}: kein übergeordneter Ordner."))?;
+    let target = folder.join(name);
+
+    if target == source {
+        return Ok(Renamed {
+            path,
+            mtime_ms: mtime_ms(&source),
+        });
+    }
+    // `exists()` statt einfach umbenennen: `fs::rename` überschreibt unter
+    // Unix wortlos, und unter Windows scheitert es — dieselbe Eingabe
+    // hätte also je nach System zwei Ausgänge.
+    if target.exists() {
+        return Err(format!(
+            "\u{201e}{name}\u{201c} gibt es in diesem Ordner bereits."
+        ));
+    }
+
+    fs::rename(&source, &target).map_err(|e| format!("{path}: {e}"))?;
+    Ok(Renamed {
+        path: target.to_string_lossy().into_owned(),
+        mtime_ms: mtime_ms(&target),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -518,6 +585,35 @@ mod tests {
             resolve_save_path(text.clone(), Some("/anderswo".into()), None).unwrap(),
             text
         );
+    }
+
+    #[test]
+    fn umbenennen_bleibt_im_ordner_und_ueberschreibt_nicht() {
+        let dir = std::env::temp_dir().join(format!("rui-rename-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let quelle = dir.join("alt.txt");
+        fs::write(&quelle, "inhalt").unwrap();
+        let pfad = quelle.to_string_lossy().into_owned();
+
+        let neu = rename_file(pfad.clone(), "neu.ps1".into()).unwrap();
+        assert_eq!(PathBuf::from(&neu.path).parent().unwrap(), dir.as_path());
+        assert!(neu.path.ends_with("neu.ps1"));
+        assert!(!quelle.exists());
+        assert_eq!(fs::read_to_string(&neu.path).unwrap(), "inhalt");
+
+        // Ein Pfad im Namen würde die Datei verschieben — das tut Umbenennen nicht.
+        assert!(rename_file(neu.path.clone(), "unten/x.txt".into()).is_err());
+        assert!(rename_file(neu.path.clone(), "  ".into()).is_err());
+
+        // Und ein belegter Name darf die andere Datei nicht schlucken.
+        fs::write(dir.join("besetzt.txt"), "fremd").unwrap();
+        assert!(rename_file(neu.path.clone(), "besetzt.txt".into()).is_err());
+        assert_eq!(
+            fs::read_to_string(dir.join("besetzt.txt")).unwrap(),
+            "fremd"
+        );
+
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

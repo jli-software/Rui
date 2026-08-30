@@ -8,8 +8,8 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Geplant
 - Kürzel nicht nur zeigen, sondern umstellen können
-- Vim: `:set number`, `:set wrap` und Verwandtschaft auf Ruis Einstellungen
 - Tabs umsortieren, Kontextmenü („Andere schliessen", „Rechts schliessen")
+- Weitere `:set`-Optionen — `:set list`, `:set tabstop`, `:set expandtab`
 
 ### Geplant, ohne Termin
 - Theming, also frei wählbare Farben
@@ -17,6 +17,96 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Code-Signing für Windows, Notarisierung für macOS
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.5.2] — 2026-08-30
+
+### Hinzugefügt
+- **Ein Reiter lässt sich umbenennen — mit Doppelklick auf den Namen.** Der
+  Name wird zum Eingabefeld, Enter übernimmt, Esc lässt es bleiben.
+  Vorausgewählt ist der Name ohne Endung: Wer umbenennt, meint fast immer
+  den Namen, und eine Endung, die beim ersten Tastendruck mitverschwindet,
+  nähme der Datei ihre Sprache. Umbenannt wird **auf der Platte**, im selben
+  Ordner — ein Reiter, der anders heisst als die Datei darunter, wäre genau
+  die Sorte Anzeige, der man nicht trauen kann. Ein bestehender Name wird
+  nicht überschrieben, ein Pfad im Feld nicht angenommen: Verschieben ist
+  „Speichern unter", nicht Umbenennen. Die Spracherkennung zieht mit, aus
+  `.txt` wird `.ps1` und die Farben stimmen sofort.
+- **`F2` und „Datei → Umbenennen…" in der Palette** machen dasselbe über ein
+  kleines Eingabefeld. Das ist bei einer einzigen offenen Datei sogar der
+  einzige Weg: Die Reiterleiste ist dann verborgen, es gibt nichts, worauf
+  man doppelklicken könnte.
+- **Ein neuer Filter „Markieren" in der Kürzel-Übersicht** — vierzehn Zeilen
+  rund um `v`, `V` und `Strg+V`, samt Textobjekten (`viw`, `vi"`, `vip`) und
+  dem, was danach auf die Auswahl wirkt. Sie standen bisher verstreut in
+  „Modus" und „Bearbeiten", also genau dort, wo niemand sie sucht.
+- **Die Gruppe „Bewegen" ist von zehn auf achtzehn Zeilen gewachsen.** Neu
+  darin: `W`/`B`/`E` (an Leerzeichen statt an Wortzeichen getrennt), Absatz
+  und Satz (`}`/`{`, `)`/`(`), `t<z>`/`T<z>`, `;`/`,`, Marken (`m<a>`, `` `a ``)
+  sowie `` `` `` und `` `. `` — der Weg zurück, wenn der Cursor woanders
+  gelandet ist als gedacht. Bei zwei Zeilen steht dabei, dass Rui das Kürzel
+  belegt: `Strg+F` gehört hier der Suche, `Strg+O`/`Strg+I` der Oberfläche.
+- **`:set wrap`, `:set number` und `:set relativenumber`** legen jetzt Ruis
+  eigene Einstellungen um — mit `no…`, `…!` und `…?` und den Kurznamen `nu`
+  und `rnu`. Was so geschaltet wird, steht danach auch im
+  Einstellungsdialog und überlebt den Neustart. `:set rnu` schaltet die
+  Nummernspalte gleich mit ein, sonst wären relative Nummern unsichtbar.
+  Angebunden über `defineOption` statt über einen eigenen `:set`-Befehl —
+  damit bleibt alles erhalten, was das Vim-Paket sonst noch unter `:set`
+  kennt.
+- **Der Tabulator wechselt die Kategorie in der Kürzel-Übersicht.** Im
+  Overlay war er bisher arbeitslos, und an die Reiter kam man nur mit der
+  Maus.
+- **Sechs Screenshots im README**, dazu Logo und Badges. Der Ordner
+  `assets/screenshots/` beschreibt, wie sie entstanden sind — mit eigenem
+  `HOME`, damit die Sage-Palette im Bild steht und nicht das Omarchy-Theme
+  des Rechners, auf dem gerade fotografiert wurde.
+
+### Geändert
+- **Rückfragen kommen jetzt aus Rui selbst, nicht mehr vom System.** Sieben
+  Stellen — Reiter schliessen, Fenster schliessen, `:q`, Datei überschreiben,
+  grosse Datei öffnen, extern geänderte Datei, Einstellungen zurücksetzen —
+  sowie alle Fehlermeldungen. Unter einem Kachel-Compositor war der
+  System-Dialog ein fremdes, ungestyltes Fenster, das nicht einmal sicher
+  über Rui landete.
+- **Die Frage nach ungespeicherten Änderungen hat drei Antworten:
+  Speichern, Verwerfen, Abbrechen.** Ein System-Dialog kennt nur zwei — wer
+  eigentlich speichern wollte, musste abbrechen, `Strg+S` drücken und noch
+  einmal schliessen. Enter liegt auf „Speichern", Esc auf „Abbrechen"; beide
+  Tasten tun damit das, was nichts vernichtet. Beim Schliessen des Fensters
+  mit mehreren geänderten Reitern heisst der erste Knopf „Alle speichern"
+  und schreibt sie der Reihe nach; bricht einer ab, bleibt das Fenster
+  offen, statt den Rest stillschweigend zu verlieren.
+- **Wird ein Reiter geschlossen, der nicht der sichtbare ist, wechselt Rui
+  vorher zu ihm.** Beim Mittelklick auf einen Reiter daneben stand die Frage
+  bisher über einer Datei, die gar nicht auf dem Bildschirm war.
+- **Der Punkt für „ungespeichert" steht vor dem Namen statt im
+  Schliessen-Knopf.** Dort war er nicht als Zustand zu lesen, sondern als
+  Knopfbeschriftung — und beim Überfahren wurde er zum Kreuz, also
+  ausgerechnet dann unsichtbar, wenn die Maus in der Nähe war. Er steht
+  jetzt links vom Namen, an derselben Stelle wie in der Statusleiste, und
+  ist immer im Layout: ungeändert nur unsichtbar, damit der Reiter beim
+  ersten Tastendruck nicht in der Breite springt.
+- **Die Kategorie in der Kürzel-Übersicht bleibt beim Tippen stehen.** Bis
+  0.5.1 sprang die Liste auf „Alle" zurück, sobald jemand tippte — das
+  Eingrenzen einer Kategorie war damit unmöglich. Damit eine Suche trotzdem
+  nie stumm in einer Kategorie hängen bleibt, steht unter der Liste, wie
+  viele Treffer daneben liegen, und ein Klick darauf zeigt sie.
+- **Aus „Dateien und Reiter" ist „Befehlszeile (:)" geworden**, von neun auf
+  zwanzig Zeilen. Die Gruppe bestand ohnehin nur aus Ex-Befehlen; jetzt
+  stehen auch `:42`, `:%s`, `:'<,'>s`, `:noh`, `:reg` und die neuen
+  `:set`-Befehle darin. Damit beantwortet ein Reiter die Frage „welche
+  `:`-Befehle gibt es hier eigentlich".
+- **„Modus" heisst „Modus wechseln"** und enthält nur noch das Umschalten
+  zwischen den Modi. Die Auswahlbefehle sind nach „Markieren" gezogen. Der
+  alte Name klang nach „was kann ich im Normalmodus", stand aber über
+  `i`, `a` und `o`.
+
+### Behoben
+- Ein offener Dialog und ein Reiter, dessen Name gerade bearbeitet wird,
+  halten die Tastenkürzel fern. Ruis Tastaturhaken hängt mit `capture` am
+  Fenster und kam sonst zuerst dran — `Strg+W` hätte den Reiter geschlossen,
+  während die Frage, ob er geschlossen werden darf, noch auf dem Bildschirm
+  stand.
 
 ## [0.5.1] — 2026-08-29
 
@@ -794,7 +884,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.5.1...HEAD
+[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/vikingjunior12/Rui/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/vikingjunior12/Rui/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/vikingjunior12/Rui/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vikingjunior12/Rui/compare/v0.3.10...v0.4.0

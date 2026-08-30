@@ -139,7 +139,7 @@ body[data-decoration="custom"] #titlebar {
   gap: 6px;
   flex-shrink: 0;
   max-width: 200px;
-  padding: 0 6px 0 12px;
+  padding: 0 6px 0 8px;
   border-right: 1px solid var(--border);
   color: var(--muted);
   font-size: 12px;
@@ -159,10 +159,41 @@ body[data-decoration="custom"] #titlebar {
   box-shadow: inset 0 2px 0 var(--accent);
 }
 
+/* Der Punkt für „geändert". Er steht immer im Layout und wird nur
+   unsichtbar geschaltet — würde er verschwinden, spränge der Reiter beim
+   ersten Tastendruck in der Breite. */
+.tab-dot {
+  flex-shrink: 0;
+  width: 6px;
+  margin-right: -2px;
+  color: var(--accent);
+  font-size: 15px;
+  line-height: 1;
+  visibility: hidden;
+}
+
+.tab.is-modified .tab-dot {
+  visibility: visible;
+}
+
 .tab-label {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* Das Feld beim Umbenennen sitzt an der Stelle des Namens und behält
+   dessen Schrift — der Reiter soll sich dabei nicht umbauen. */
+.tab-rename {
+  flex: 1;
+  min-width: 60px;
+  padding: 1px 4px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  outline: none;
 }
 
 .tab.is-modified .tab-label {
@@ -182,15 +213,11 @@ body[data-decoration="custom"] #titlebar {
   cursor: default;
 }
 
-/* Das Kreuz erscheint erst beim Überfahren; der Punkt für „geändert"
-   steht immer da, sonst sähe ein geänderter Tab aus wie jeder andere. */
-.tab:not(:hover):not(.is-active):not(.is-modified) .tab-close {
+/* Das Kreuz erscheint erst beim Überfahren. Ob etwas ungespeichert ist,
+   sagt der Punkt links — bis 0.5.1 stand das in diesem Knopf und war
+   dadurch beim Überfahren weg. */
+.tab:not(:hover):not(.is-active) .tab-close {
   opacity: 0;
-}
-
-.tab.is-modified .tab-close {
-  opacity: 1;
-  color: var(--accent);
 }
 
 .tab-close:hover {
@@ -497,6 +524,92 @@ body[data-decoration="custom"] #titlebar {
 
 .palette-input::placeholder {
   color: var(--muted);
+}
+
+/* ---- Rückfragen im Fenster (dialog.ts) ---- */
+
+.dialog {
+  width: min(460px, calc(100vw - 48px));
+  margin-top: 16vh;
+  padding: 18px 20px 16px;
+}
+
+.dialog-title {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Das Zeichen trägt die Warnung, nicht der ganze Kasten: Ein rot
+   gerahmter Dialog schreit auch dann, wenn nur eine Datei neu geladen
+   werden soll. */
+.dialog[data-kind="warning"] .dialog-title::before,
+.dialog[data-kind="error"] .dialog-title::before {
+  margin-right: 7px;
+  color: var(--danger);
+}
+
+.dialog[data-kind="warning"] .dialog-title::before {
+  content: "\26A0";
+}
+
+.dialog[data-kind="error"] .dialog-title::before {
+  content: "\2715";
+}
+
+.dialog-text {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  /* Ein Dateiname mit langem Pfad darf den Dialog nicht breiter machen. */
+  overflow-wrap: anywhere;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.dialog-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: default;
+}
+
+.dialog-btn:hover {
+  background: var(--surface-raised);
+  border-color: var(--muted);
+}
+
+.dialog-btn[data-tone="primary"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.dialog-btn[data-tone="danger"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.dialog-btn[data-tone="danger"]:hover {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+/* Der Fokusrahmen ist hier keine Kür: Welcher Knopf Enter bekommt, ist
+   die eigentliche Information des Dialogs. */
+.dialog-btn:focus-visible,
+.dialog-btn:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .palette--prompt .palette-input {
@@ -991,6 +1104,17 @@ kbd {
   max-width: 52%;
   text-align: center;
   white-space: normal;
+}
+
+/* Die Zeile unter der Liste, wenn die Suche ausserhalb der gewählten
+   Kategorie mehr gefunden hat. */
+.shortcuts-more {
+  /* Über die ganze Breite, nicht neben die letzte Gruppe: Die Zeile
+     gehört zur Liste als Ganzes und nicht in eine ihrer Spalten. */
+  grid-column: 1 / -1;
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--border);
+  text-align: center;
 }
 
 .shortcuts-empty {

@@ -47,6 +47,12 @@ export interface LoadedDocument {
 }
 
 /** Spiegelt `quick_open::QuickOpenFile` auf der Rust-Seite. */
+/** Was `rename_file` zurückgibt: der neue Pfad und die Zeit danach. */
+export interface RenameResult {
+  path: string;
+  mtimeMs: number;
+}
+
 export interface QuickOpenFile {
   path: string;
   name: string;

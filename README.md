@@ -1,7 +1,20 @@
+<div align="center">
+
+<img src="assets/logo/rui.svg" width="96" height="96" alt="">
+
 # Rui
 
-A small, fast text editor for Windows and Linux — the kind of thing Notepad++
-was, with Vim keybindings you can switch on or leave off.
+**A small, fast text editor for Windows and Linux** — the kind of thing
+Notepad++ was, with Vim keybindings you can switch on or leave off.
+
+[![Release](https://img.shields.io/github/v/release/vikingjunior12/Rui?style=flat-square&color=94b489&label=release)](https://github.com/vikingjunior12/Rui/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/vikingjunior12/Rui/release.yml?style=flat-square&color=94b489&label=build)](https://github.com/vikingjunior12/Rui/actions/workflows/release.yml)
+[![Licence](https://img.shields.io/badge/licence-MIT-94b489?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-94b489?style=flat-square)](https://github.com/vikingjunior12/Rui/releases)
+
+</div>
+
+![Rui with a PowerShell script open](assets/screenshots/editor.png)
 
 Built because Windows Notepad stopped being enough and there is not much
 between it and a full IDE. Rui opens a `.ps1`, a log or a diff instantly,
@@ -11,10 +24,6 @@ to actually read the snippets it produces before they go anywhere — that is
 the case this was built for.
 
 > **Note on language:** the user interface is German only.
-
-![Rui editing a PowerShell script](assets/screenshots/rui.png)
-
-<!-- Screenshot: rui.png — dark theme, a .ps1 open, status bar visible. -->
 
 ## Install
 
@@ -54,7 +63,7 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ## What's in it
 
-**Editing**
+### Editing
 
 - Syntax highlighting for 16 languages, each loaded on demand: PowerShell,
   shell, Rust, C#, Go, Python, JS/TS, JSON, YAML, TOML, SQL, XML, INI,
@@ -64,10 +73,6 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 - Find and replace, go to line, undo/redo, bracket matching, auto-indent,
   code folding, line numbers (absolute or relative)
 - Command palette on `Ctrl+Shift+P` instead of a menu bar
-- Shortcut sheet on `Ctrl+K`, searchable and split into category tabs, with
-  the Vim commands up front while Vim mode is on. The clipboard section
-  spells out the normal-mode routes into the system clipboard — `:%y+`,
-  `:10,20y+`, `:'<,'>y+`, `"+d`, `:reg`
 - `Ctrl+Shift+C` copies the selection, `Ctrl+Shift+A` the whole file,
   `Ctrl+Shift+V` pastes — all through the system clipboard, no Vim needed
 - `Alt+Z` toggles word wrap, for the difference between writing a note and
@@ -77,13 +82,35 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
 - **About Rui** behind the info icon: version, developer, licence, and one
   button that copies the version block a bug report starts with
 
-**Files**
+### The shortcut sheet
+
+![The shortcut sheet, split into category tabs](assets/screenshots/shortcuts.png)
+
+`Ctrl+K` — searchable, and split into category tabs: modes, motions,
+selection, editing, search, clipboard, the `:` commands, and Rui's own keys.
+The tab you pick stays put while you type, so a category and a search term
+combine; a line under the list says how many matches are sitting in the other
+categories and switches to all of them with one click. `Tab` cycles the
+categories from the keyboard.
+
+With Vim mode on, the Vim commands come first — including the ones that Rui's
+own shortcuts shadow, spelled out where you would otherwise reach for them
+and miss.
+
+### Files
+
+![Quick Open, filtering the notes folder](assets/screenshots/quick-open.png)
 
 - **Tabs.** Several files open at once, `Ctrl+T` for a new one, `Ctrl+W` to
   close, `Ctrl+Tab` to cycle, `Ctrl+1`–`Ctrl+9` to jump, middle click to
   close. Each tab keeps its full editor state — cursor, selection, folds and
   undo history — so switching back means carrying on, not reopening. The bar
   stays hidden while a single file is open
+- **Rename in the tab.** Double click the name, or `F2` — the file is renamed
+  on disk, in the same folder, and the syntax highlighting follows the new
+  extension. An unnamed buffer gets its name and its place in one go
+- **A dot before the name** marks a tab with unsaved changes, in the tab bar
+  and in the status bar
 - **Saves only when told to.** `Ctrl+S`, or `:w`. Autosave exists as a
   setting and is off by default — opening a config file to read it must never
   change it
@@ -99,7 +126,16 @@ commit — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
   drop of several files all open one tab each. A file that is already open
   is not opened twice — Rui goes to its tab
 
-**Vim keybindings**
+![The dialog before unsaved changes are lost](assets/screenshots/unsaved.png)
+
+Every question Rui asks is asked inside the window, in Rui's own colours —
+not by a system dialog that lands somewhere else on a tiling compositor. And
+the question about unsaved work has three answers, because that is how many
+it has: save, discard, or don't close after all.
+
+### Vim keybindings
+
+![Visual line mode, with the mode in the status bar](assets/screenshots/vim.png)
 
 Off by default, switched on in the settings, and loaded only if you use them.
 Normal, insert, visual and replace mode, with the current one and any pending
@@ -113,16 +149,19 @@ Tabs answer to `:tabnew [file]`, `:tabe`, `:tabn`, `:tabp` and `:tabc`, as
 well as `:bn`, `:bp` and `:bd` — one tab holds exactly one buffer here, so
 both families mean the same thing. `:q` closes the tab and only the last one
 closes the window, the way Vim does it.
+
+`:set wrap`, `:set number` and `:set relativenumber` — with the `no…`, `…!`
+and `…?` forms and the short names `nu` and `rnu` — write straight into Rui's
+settings, so what you switch there is still switched after a restart and is
+the same switch the settings dialog shows. Everything else `:set` knows stays
+with the Vim package.
+
 A write reports back in the status bar the way Vim reports in its command
 line — which is where a buffer that got its name on save tells you that name.
 `"+y` and `"+p` reach the system clipboard, as does `Ctrl+Shift+C` /
 `Ctrl+Shift+V`.
 
-The settings carry a reference of both Rui's own shortcuts and the essential
-Vim motions — which makes this a reasonable place to learn the keys without
-leaving Windows.
-
-**System integration**
+### System integration
 
 One section in the settings hooks Rui into the system and unhooks it again.
 Nothing is written system-wide — it all lives under your user profile, no
@@ -136,7 +175,9 @@ administrator or root rights.
   and writes a `.desktop` entry so Rui appears in the file manager's *Open
   with*. Neither makes Rui the default; that stays your call
 
-**Looks**
+### Looks
+
+![The same editor in the light palette](assets/screenshots/light.png)
 
 Sage palette in light and dark, following the system by default. On Linux it
 picks up the active [Omarchy](https://omarchy.org) theme — syntax colours as
@@ -153,6 +194,7 @@ is automatic: own title bar on Windows, none under a tiling compositor.
 | `Ctrl+O` | Quick Open |
 | `Ctrl+Shift+O` | Open via system dialog |
 | `Ctrl+N` / `Ctrl+S` / `Ctrl+Shift+S` | New / Save / Save as |
+| `F2` | Rename the file |
 | `Ctrl+F` / `Ctrl+G` | Find and replace / Go to line |
 | `Ctrl+Shift+C` / `Ctrl+Shift+A` / `Ctrl+Shift+V` | Copy selection / Copy whole file / Paste |
 | `Alt+Z` | Word wrap on or off |

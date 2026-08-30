@@ -17,9 +17,9 @@ export interface ShortcutRow {
   title: string;
   keys: string;
   /**
-   * Was dasselbe Kürzel in NeoVim täte. Steht nur bei den Rui-Kürzeln, die
-   * eine Vim-Bindung verdecken — wer aus NeoVim kommt, greift genau dort
-   * daneben und soll es hier schwarz auf weiss finden.
+   * Die Fussnote zur Zeile — fast immer der Hinweis, dass Rui und NeoVim
+   * sich hier in die Quere kommen. Wer aus NeoVim kommt, greift genau an
+   * diesen Stellen daneben und soll es schwarz auf weiss finden.
    */
   instead?: string;
 }
@@ -53,30 +53,76 @@ function groupHeading(group: Group): string {
  */
 const VIM_GROUPS: Group[] = [
   {
-    title: "Modus",
+    title: "Modus wechseln",
+    short: "Modi",
+    hint:
+      "Der Normalmodus ist der, in dem Vim wartet: Dort tippt man Befehle, " +
+      "nicht Text. Alles hier führt hinein oder hinaus.",
     rows: [
       { title: "Zurück in den Normalmodus", keys: "Esc  ·  Strg+[" },
       { title: "Einfügen vor / nach dem Cursor", keys: "i / a" },
       { title: "Einfügen am Zeilenanfang / Zeilenende", keys: "I / A" },
       { title: "Neue Zeile darunter / darüber", keys: "o / O" },
       { title: "Ersetzen (überschreiben)", keys: "R" },
-      { title: "Auswahl: zeichen- / zeilen- / blockweise", keys: "v / V / Strg+V" },
-      { title: "Zur letzten Auswahl zurück", keys: "gv" },
+      { title: "Zurück an die letzte Einfügestelle", keys: "gi" },
+      { title: "Befehlszeile öffnen", keys: ":" },
     ],
   },
   {
     title: "Bewegen",
+    hint:
+      "Jede Bewegung nimmt einen Zähler davor: 5j, 3w, 2}. Und jede von " +
+      "ihnen ist zugleich das Ziel eines Operators — d3w löscht drei Wörter.",
     rows: [
       { title: "Links / unten / oben / rechts", keys: "h / j / k / l" },
       { title: "Wortweise vor / zurück / ans Wortende", keys: "w / b / e" },
+      { title: "Dasselbe, aber nur an Leerzeichen getrennt", keys: "W / B / E" },
+      { title: "Absatz vor / zurück", keys: "} / {" },
+      { title: "Satz vor / zurück", keys: ") / (" },
       { title: "Zeilenanfang / erstes Zeichen / Zeilenende", keys: "0 / ^ / $" },
       { title: "Dokumentanfang / Dokumentende", keys: "gg / G" },
       { title: "Zu Zeile n", keys: ":n  ·  nG" },
       { title: "Halbe Seite hoch / runter", keys: "Strg+U / Strg+D" },
+      {
+        title: "Ganze Seite zurück",
+        keys: "Strg+B",
+        instead: "vorwärts wäre Strg+F — der gehört in Rui der Suche",
+      },
       { title: "Bildschirm oben / Mitte / unten", keys: "H / M / L" },
       { title: "Passende Klammer", keys: "%" },
       { title: "Zeichen in der Zeile suchen / rückwärts", keys: "f<z> / F<z>" },
+      { title: "Bis kurz davor / rückwärts", keys: "t<z> / T<z>" },
+      { title: "Diesen Sprung wiederholen / umgekehrt", keys: "; / ," },
+      {
+        title: "Zurück, wo der Cursor vorhin stand",
+        keys: "``",
+        instead: "die Sprungliste auf Strg+O / Strg+I gehört in Rui der Oberfläche",
+      },
+      { title: "Zur letzten Änderung", keys: "`." },
+      { title: "Marke setzen / anspringen", keys: "m<a>  ·  `a" },
       { title: "Cursorzeile nach oben / Mitte / unten rollen", keys: "zt / zz / zb" },
+    ],
+  },
+  {
+    title: "Markieren",
+    hint:
+      "Erst v, V oder Strg+V, dann eine Bewegung — und auf die Auswahl " +
+      "wirkt jeder Operator: d löscht sie, y kopiert sie, > rückt sie ein.",
+    rows: [
+      { title: "Zeichen- / zeilen- / blockweise markieren", keys: "v / V / Strg+V" },
+      { title: "Auswahl aufheben", keys: "Esc" },
+      { title: "Zur letzten Auswahl zurück", keys: "gv" },
+      { title: "Das andere Ende anfassen", keys: "o" },
+      { title: "Ganze Datei", keys: "ggVG" },
+      { title: "Wort — ohne / mit Leerzeichen daneben", keys: "viw / vaw" },
+      { title: "In Anführungszeichen — ohne / mit", keys: 'vi" / va"' },
+      { title: "In Klammern — ohne / mit", keys: "vi( · vi{ · vi[" },
+      { title: "Absatz — ohne / mit Leerzeile", keys: "vip / vap" },
+      { title: "Bis Zeilenende", keys: "v$" },
+      { title: "Auswahl löschen / ändern / kopieren", keys: "d / c / y" },
+      { title: "Auswahl einrücken / ausrücken", keys: "> / <" },
+      { title: "Auswahl gross / klein schreiben", keys: "U / u" },
+      { title: "Auswahl in die Zwischenablage", keys: '"+y' },
     ],
   },
   {
@@ -133,9 +179,12 @@ const VIM_GROUPS: Group[] = [
     ],
   },
   {
-    title: "Dateien und Reiter",
-    short: "Dateien",
-    hint: "Ruis eigene Wege — :w schreibt mit dem Encoding der geöffneten Datei.",
+    title: "Befehlszeile (:)",
+    short: ":-Befehle",
+    hint:
+      "Alles, was im Normalmodus mit : anfängt, in einer Liste. Schreiben " +
+      "und Öffnen gehen dabei durch Ruis eigene Wege — :w behält also " +
+      "Encoding und Zeilenende der geöffneten Datei.",
     rows: [
       { title: "Speichern", keys: ":w" },
       { title: "Unter einem Namen speichern", keys: ":w notiz.ps1" },
@@ -146,6 +195,17 @@ const VIM_GROUPS: Group[] = [
       { title: "Neuer Reiter / mit Datei", keys: ":tabnew / :tabnew pfad" },
       { title: "Nächster / voriger Reiter", keys: ":tabn / :tabp" },
       { title: "Reiter schliessen", keys: ":tabc  ·  :bd" },
+      { title: "Zu Zeile 42 / ans Dateiende", keys: ":42  ·  :$" },
+      { title: "In der ganzen Datei ersetzen", keys: ":%s/alt/neu/g" },
+      { title: "Nur in der Auswahl ersetzen", keys: ":'<,'>s/alt/neu/g" },
+      { title: "Hervorhebung der Suche ausschalten", keys: ":noh" },
+      { title: "Ganze Datei / Zeilenbereich kopieren", keys: ":%y+  ·  :10,20y+" },
+      { title: "Belegte Register ansehen", keys: ":reg" },
+      { title: "Zeilenumbruch an / aus", keys: ":set wrap / :set nowrap" },
+      { title: "Zeilennummern an / aus", keys: ":set number / :set nonumber" },
+      { title: "Relative Zeilennummern an / aus", keys: ":set relativenumber / :set norelativenumber" },
+      { title: "Kurzformen davon", keys: ":set nu  ·  :set rnu  ·  :set nowrap" },
+      { title: "Befehlszeile verlassen", keys: "Esc" },
     ],
   },
 ];
@@ -184,13 +244,16 @@ export class ShortcutsOverlay {
   /**
    * Der gewählte Kategoriereiter, `null` für „Alle".
    *
-   * Mit eingeschalteter Vim-Steuerung stehen über siebzig Zeilen in der
-   * Liste — vollständig, aber genau das war die Klage: Wer nach dem
+   * Mit eingeschalteter Vim-Steuerung stehen weit über hundert Zeilen in
+   * der Liste — vollständig, aber genau das war die Klage: Wer nach dem
    * Zwischenablage-Griff sucht, will nicht an „Bewegen" vorbeiscrollen.
-   * Die Reiter schneiden die Liste auf eine Gruppe herunter, die Suche
-   * bleibt der Weg quer durch alle.
+   * Der Reiter schneidet die Liste auf eine Gruppe herunter und bleibt
+   * beim Tippen stehen, sodass Kategorie und Suche sich kombinieren
+   * lassen; was dabei ausserhalb liegt, meldet die Zeile unter der Liste.
    */
   private active: string | null = null;
+  /** Die Reiter in der Reihenfolge, in der sie stehen — für den Tabulator. */
+  private categories: (string | null)[] = [];
 
   constructor(private readonly actions: ShortcutsActions) {
     this.root = document.createElement("div");
@@ -204,7 +267,8 @@ export class ShortcutsOverlay {
         </header>
         <input class="palette-input" type="text" spellcheck="false" autocomplete="off"
                placeholder="Kürzel suchen…" aria-label="Kürzel suchen">
-        <div class="shortcuts-cats" role="tablist" aria-label="Kategorien"></div>
+        <div class="shortcuts-cats" role="tablist" aria-label="Kategorien"
+             title="Tabulator wechselt die Kategorie"></div>
         <div class="shortcuts-body"></div>
       </div>`;
     document.body.appendChild(this.root);
@@ -214,10 +278,28 @@ export class ShortcutsOverlay {
     this.body = this.root.querySelector(".shortcuts-body")!;
 
     this.input.addEventListener("input", () => {
-      // Wer tippt, sucht quer durch alles. Eine Suche, die stumm in einer
-      // Kategorie hängen bleibt, sieht aus wie „gibt es nicht".
-      this.active = null;
+      // Die gewählte Kategorie bleibt beim Tippen stehen — wer in
+      // „Markieren" ist und „wort" sucht, meint das Wort in dieser Gruppe.
+      // Bis 0.5.1 sprang die Liste dabei auf „Alle" zurück, was das
+      // Eingrenzen unmöglich machte. Damit eine Suche trotzdem nie stumm in
+      // einer Kategorie hängen bleibt, sagt eine Zeile unter der Liste, wie
+      // viel daneben noch läge, und schaltet auf einen Klick um.
       this.render();
+      this.body.scrollTop = 0;
+    });
+    // Der Tabulator wechselt die Kategorie. Im Overlay ist er sonst
+    // arbeitslos — das Eingabefeld ist das einzige Ziel, das er ansteuern
+    // könnte —, und ohne ihn käme man an die Reiter nur mit der Maus.
+    this.input.addEventListener("keydown", (event) => {
+      if (event.key !== "Tab") return;
+      event.preventDefault();
+      if (this.categories.length < 2) return;
+      const at = this.categories.indexOf(this.active);
+      const step = event.shiftKey ? -1 : 1;
+      const count = this.categories.length;
+      this.active = this.categories[(Math.max(at, 0) + step + count) % count];
+      this.render();
+      this.body.scrollTop = 0;
     });
     this.cats.addEventListener("click", (event) => {
       const chip = (event.target as HTMLElement).closest<HTMLElement>(".shortcuts-cat");
@@ -289,18 +371,49 @@ export class ShortcutsOverlay {
 
     this.renderCategories(matched.map((entry) => entry.group));
 
-    const sections = matched
-      .filter((entry) => this.active === null || entry.group.title === this.active)
+    const inCategory = (entry: { group: Group }) =>
+      this.active === null || entry.group.title === this.active;
+    const elsewhere = matched
+      .filter((entry) => !inCategory(entry))
+      .reduce((count, entry) => count + entry.rows.length, 0);
+
+    const nodes: HTMLElement[] = matched
+      .filter(inCategory)
       .map((entry) => renderGroup(entry.group, entry.rows));
 
-    if (sections.length === 0) {
+    if (nodes.length === 0) {
       const empty = document.createElement("p");
       empty.className = "shortcuts-empty";
-      empty.textContent = "Kein passendes Kürzel gefunden.";
-      this.body.replaceChildren(empty);
-      return;
+      empty.textContent =
+        elsewhere > 0
+          ? `Unter „${this.active}" ist nichts dabei.`
+          : "Kein passendes Kürzel gefunden.";
+      nodes.push(empty);
     }
-    this.body.replaceChildren(...sections);
+    // Nur bei einer Suche: Ohne Eingabe hiesse die Zeile bloss „siebzig
+    // weitere in den anderen Kategorien" und wäre damit Rauschen.
+    if (query !== "" && elsewhere > 0) nodes.push(this.moreLine(elsewhere));
+
+    this.body.replaceChildren(...nodes);
+  }
+
+  /** „… und 12 weitere anderswo" — der Ausweg aus einer zu engen Kategorie. */
+  private moreLine(count: number): HTMLElement {
+    const line = document.createElement("p");
+    line.className = "shortcuts-more";
+    const button = document.createElement("button");
+    button.className = "link-btn";
+    button.textContent =
+      count === 1
+        ? "1 weiterer Treffer in einer anderen Kategorie"
+        : `${count} weitere Treffer in anderen Kategorien`;
+    button.addEventListener("click", () => {
+      this.active = null;
+      this.render();
+      this.body.scrollTop = 0;
+    });
+    line.append(button);
+    return line;
   }
 
   /**
@@ -312,8 +425,10 @@ export class ShortcutsOverlay {
     this.cats.hidden = groups.length < 2;
     if (this.cats.hidden) {
       this.cats.replaceChildren();
+      this.categories = [];
       return;
     }
+    this.categories = [null, ...groups.map((group) => group.title)];
 
     const chip = (label: string, value: string | null) => {
       const button = document.createElement("button");
