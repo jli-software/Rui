@@ -18,6 +18,20 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+## [0.5.3] — 2026-08-30
+
+### Geändert
+- **README neu geschrieben, deutlich kürzer.** Der Einstieg erzählt jetzt,
+  warum es Rui gibt — Windows Notepad reichte nie, Notepad++ passte nie
+  richtig, gearbeitet wird meist unter Linux, aber Windows lässt sich für
+  die Arbeit nicht vermeiden: Rui ist derselbe Editor auf beiden, im Kern
+  ein Neovim in GUI-Form, Vim-Steuerung per Vorgabe aus. Die langen
+  Absätze unter jedem Feature (Fuzzy-Suche-Algorithmus, Flexbox-Details,
+  Registernamen) sind raus, die sechs Screenshots und ihre kurzen
+  Bildunterschriften bleiben. Der eigene „Not in it"-Abschnitt ist in den
+  Einstiegstext gewandert, der Hinweis „Oberfläche nur Deutsch" ist raus,
+  weil er mit der geplanten Lokalisierung ohnehin bald überholt ist.
+
 ## [0.5.2] — 2026-08-30
 
 ### Hinzugefügt
