@@ -29,12 +29,15 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
   Ordner — ein Reiter, der anders heisst als die Datei darunter, wäre genau
   die Sorte Anzeige, der man nicht trauen kann. Ein bestehender Name wird
   nicht überschrieben, ein Pfad im Feld nicht angenommen: Verschieben ist
-  „Speichern unter", nicht Umbenennen. Die Spracherkennung zieht mit, aus
-  `.txt` wird `.ps1` und die Farben stimmen sofort.
-- **`F2` und „Datei → Umbenennen…" in der Palette** machen dasselbe über ein
-  kleines Eingabefeld. Das ist bei einer einzigen offenen Datei sogar der
-  einzige Weg: Die Reiterleiste ist dann verborgen, es gibt nichts, worauf
-  man doppelklicken könnte.
+  „Speichern unter", nicht Umbenennen. Abgewiesen werden ausserdem die
+  Zeichen, die Windows im Dateinamen verbietet, unsichtbare Steuerzeichen
+  und Namen aus lauter Punkten. Die Spracherkennung zieht mit, aus `.txt`
+  wird `.ps1` und die Farben stimmen sofort.
+- **`F2` und „Datei → Umbenennen…" in der Palette** öffnen dasselbe Feld im
+  Reiter, damit beide Wege dasselbe Bild ergeben. Bei einer einzigen
+  offenen Datei ist die Reiterleiste verborgen — dann fragt stattdessen ein
+  Eingabefeld in der Mitte, denn ein Feld, das niemand sieht, wäre schlicht
+  ein hängender Editor. Danach liegt der Fokus wieder im Text.
 - **Ein neuer Filter „Markieren" in der Kürzel-Übersicht** — vierzehn Zeilen
   rund um `v`, `V` und `Strg+V`, samt Textobjekten (`viw`, `vi"`, `vip`) und
   dem, was danach auf die Auswahl wirkt. Sie standen bisher verstreut in

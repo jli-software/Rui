@@ -139,12 +139,16 @@ export class TabBar {
    * Vorausgewählt ist der Name ohne Endung: Wer umbenennt, meint fast
    * immer den Namen und nicht das `.ps1` — und eine Endung, die beim
    * ersten Tastendruck mit verschwindet, nimmt der Datei ihre Sprache.
+   *
+   * `false` heisst: Hier ist gerade nichts zu bearbeiten — die Leiste ist
+   * bei einer einzigen Datei verborgen, oder ein anderer Name steht
+   * bereits in Arbeit. Der Aufrufer fragt dann anders nach.
    */
-  private startRename(id: number) {
-    if (this.renaming !== null) return;
+  startRename(id: number): boolean {
+    if (this.renaming !== null || this.root.hidden) return false;
     const tab = this.list.querySelector<HTMLElement>(`.tab[data-id="${id}"]`);
     const label = tab?.querySelector<HTMLElement>(".tab-label");
-    if (!tab || !label) return;
+    if (!tab || !label) return false;
 
     const name = label.textContent ?? "";
     const input = document.createElement("input");
@@ -153,6 +157,11 @@ export class TabBar {
     input.spellcheck = false;
     input.value = name;
     input.setAttribute("aria-label", "Datei umbenennen");
+
+    // Wohin der Fokus danach zurückgeht. Über `F2` ist das der Text, und
+    // ein Editor, in den man nach dem Umbenennen erst wieder hineinklicken
+    // muss, wäre ein Rückschritt gegenüber gar keinem Umbenennen.
+    const previous = document.activeElement as HTMLElement | null;
 
     this.renaming = id;
     label.replaceWith(input);
@@ -163,6 +172,7 @@ export class TabBar {
       settled = true;
       const value = input.value.trim();
       this.renaming = null;
+      if (previous && previous !== input) previous.focus?.();
       // Erst neu zeichnen, dann melden: Der Aufrufer schreibt auf die
       // Platte und zeichnet danach selbst — käme die Leiste hinterher,
       // stünde kurz wieder der alte Name da.
@@ -190,6 +200,7 @@ export class TabBar {
     input.focus();
     const dot = name.lastIndexOf(".");
     input.setSelectionRange(0, dot > 0 ? dot : name.length);
+    return true;
   }
 
   private redraw() {

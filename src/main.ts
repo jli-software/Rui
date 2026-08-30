@@ -1403,14 +1403,17 @@ class App {
   }
 
   /**
-   * Umbenennen über Tastatur und Palette.
+   * Umbenennen über `F2` und die Palette.
    *
-   * Der Doppelklick im Reiter ist der eine Weg, das hier der andere — und
-   * bei einer einzigen offenen Datei sogar der einzige: Die Reiterleiste
-   * ist dann verborgen, es gibt also gar nichts, worauf man klicken
-   * könnte.
+   * Ist die Reiterleiste sichtbar, wird im Reiter selbst getippt — an
+   * derselben Stelle wie beim Doppelklick, damit beide Wege dasselbe Bild
+   * ergeben. Bei einer einzigen offenen Datei ist die Leiste verborgen;
+   * dann fragt ein Eingabefeld, denn ein Feld, das niemand sieht, wäre
+   * schlicht ein hängender Editor.
    */
   private async renamePrompt() {
+    if (this.tabBar.startRename(this.tab.id)) return;
+
     const before = tabTitle(this.tab);
     const answer = await promptInput("Umbenennen in", before);
     const name = answer?.trim();

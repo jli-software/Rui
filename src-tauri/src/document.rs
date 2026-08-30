@@ -442,6 +442,16 @@ pub fn rename_file(path: String, name: String) -> Result<Renamed, String> {
     if name.contains(['<', '>', ':', '"', '|', '?', '*']) {
         return Err("Im Namen sind < > : \" | ? * nicht erlaubt.".to_string());
     }
+    // Steuerzeichen sieht man im Eingabefeld nicht, und eine Tastatur kann
+    // sie hineinbefördern, ohne dass jemand es merkt. Ein Dateiname, den
+    // man nicht lesen kann, ist auch keiner.
+    if name.chars().any(|c| c.is_control()) {
+        return Err("Im Namen stehen unsichtbare Steuerzeichen.".to_string());
+    }
+    // `.` und `..` meinen Ordner, nicht Dateien.
+    if name.chars().all(|c| c == '.') {
+        return Err("Der Name darf nicht nur aus Punkten bestehen.".to_string());
+    }
 
     let source = PathBuf::from(&path);
     if !source.exists() {
@@ -604,6 +614,10 @@ mod tests {
         // Ein Pfad im Namen würde die Datei verschieben — das tut Umbenennen nicht.
         assert!(rename_file(neu.path.clone(), "unten/x.txt".into()).is_err());
         assert!(rename_file(neu.path.clone(), "  ".into()).is_err());
+        // Unsichtbares und Punkte-Namen ebenso: beides sieht man dem
+        // Eingabefeld nicht an, wenn es einmal drinsteht.
+        assert!(rename_file(neu.path.clone(), "mit\u{7f}steuerzeichen.md".into()).is_err());
+        assert!(rename_file(neu.path.clone(), "..".into()).is_err());
 
         // Und ein belegter Name darf die andere Datei nicht schlucken.
         fs::write(dir.join("besetzt.txt"), "fremd").unwrap();
