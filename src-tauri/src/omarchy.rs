@@ -200,7 +200,8 @@ dark_foreground = "#565f89"
     /// Fehlende Felder sind erlaubt: Nicht jedes Theme pflegt alle Farben.
     #[test]
     fn unvollstaendige_datei_bleibt_lesbar() {
-        let c: OmarchyColors = toml::from_str("mode = \"light\"\nbackground = \"#ffffff\"").unwrap();
+        let c: OmarchyColors =
+            toml::from_str("mode = \"light\"\nbackground = \"#ffffff\"").unwrap();
         assert_eq!(c.mode.as_deref(), Some("light"));
         assert!(c.dark_foreground.is_none());
     }

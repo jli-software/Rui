@@ -548,7 +548,10 @@ mod tests {
         // der 29. im Namen. Der Test schlägt fehl, sobald jemand
         // `format_date` auf `Utc` umstellt — ausser die Maschine steht
         // selbst auf UTC, wo die Frage nicht existiert.
-        assert_eq!(format_date(NoteDateFormat::Ymd, zeitpunkt(22, 30)), "2026-08-28");
+        assert_eq!(
+            format_date(NoteDateFormat::Ymd, zeitpunkt(22, 30)),
+            "2026-08-28"
+        );
         assert_eq!(
             format_date(NoteDateFormat::YmdCompactHm, zeitpunkt(9, 5)),
             "20260828-0905"

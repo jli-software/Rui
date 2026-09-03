@@ -90,7 +90,10 @@ fn platform_default() -> (DecorationMode, &'static str) {
 pub fn resolve(setting: DecorationMode) -> ResolvedDecoration {
     // Highest priority: Startparameter, für einen einzelnen Lauf ohne die
     // gespeicherten Einstellungen anzufassen.
-    if let Some(mode) = env::var("RUI_DECORATION").ok().and_then(|v| DecorationMode::parse(&v)) {
+    if let Some(mode) = env::var("RUI_DECORATION")
+        .ok()
+        .and_then(|v| DecorationMode::parse(&v))
+    {
         if mode != DecorationMode::Auto {
             return ResolvedDecoration {
                 mode,

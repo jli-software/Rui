@@ -350,7 +350,11 @@ mod tests {
 
     #[test]
     fn fehlender_ordner_liefert_einen_verstaendlichen_fehler() {
-        let err = scan(vec!["definitiv-nicht-vorhanden-rui".to_string()], extensions()).unwrap_err();
+        let err = scan(
+            vec!["definitiv-nicht-vorhanden-rui".to_string()],
+            extensions(),
+        )
+        .unwrap_err();
         assert!(err.contains("Ordner nicht gefunden"));
     }
 }

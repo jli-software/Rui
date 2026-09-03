@@ -47,7 +47,11 @@ fn resolve(arg: &str, cwd: &Path) -> Option<String> {
     // nur stört.
     let resolved = absolute.canonicalize().unwrap_or(absolute);
     let text = resolved.to_string_lossy().into_owned();
-    Some(text.strip_prefix(WINDOWS_VERBATIM).unwrap_or(&text).to_string())
+    Some(
+        text.strip_prefix(WINDOWS_VERBATIM)
+            .unwrap_or(&text)
+            .to_string(),
+    )
 }
 
 /// Dateien, mit denen die App gestartet wurde. Das Frontend holt sie ab,
@@ -107,7 +111,8 @@ pub fn run() {
                 // Titelleiste unter Windows, gar keine unter Hyprland) zieht
                 // das Frontend über `resolve_decoration` selbst nach.
                 if let Some(window) = app.get_webview_window("main") {
-                    let settings = settings::load_settings(app.handle().clone()).unwrap_or_default();
+                    let settings =
+                        settings::load_settings(app.handle().clone()).unwrap_or_default();
                     let resolved = decoration::resolve(settings.decoration_mode);
                     let _ = window.set_decorations(resolved.native_chrome());
                 }
@@ -175,13 +180,20 @@ mod tests {
 
         let found = file_args(argv.clone(), cwd);
         assert_eq!(found.len(), 1, "relativer Pfad muss gefunden werden");
-        assert!(Path::new(&found[0]).is_absolute(), "Ergebnis muss absolut sein");
+        assert!(
+            Path::new(&found[0]).is_absolute(),
+            "Ergebnis muss absolut sein"
+        );
         assert!(
             !found[0].starts_with(WINDOWS_VERBATIM),
             "Pfad darf kein Verbatim-Präfix tragen"
         );
 
         // Dasselbe Argument aus einem anderen Verzeichnis findet nichts.
-        assert!(file_args(argv, Path::new(env!("CARGO_MANIFEST_DIR")).join("src").as_path()).is_empty());
+        assert!(file_args(
+            argv,
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("src").as_path()
+        )
+        .is_empty());
     }
 }

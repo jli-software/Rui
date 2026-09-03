@@ -358,9 +358,11 @@ mod tests {
     fn leere_sitzung_bleibt_leer() {
         assert!(migrate_session(serde_json::Value::Null).tabs.is_empty());
         assert!(migrate_session(serde_json::json!({})).tabs.is_empty());
-        assert!(migrate_session(serde_json::json!({ "tabs": [], "active": 0 }))
-            .tabs
-            .is_empty());
+        assert!(
+            migrate_session(serde_json::json!({ "tabs": [], "active": 0 }))
+                .tabs
+                .is_empty()
+        );
     }
 
     /// Die neue Fassung geht unverändert durch die Migration.
