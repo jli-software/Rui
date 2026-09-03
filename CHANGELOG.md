@@ -23,7 +23,8 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Der Release-Workflow arbeitet beim Bauen nur noch mit Leserechten; allein der
   Veröffentlichungsjob darf Releases schreiben. Der Windows-Build bricht ab,
   wenn NSIS- oder MSI-Installer fehlen, statt ein unvollständiges Artefaktset
-  hochzuladen.
+  hochzuladen. Die Artefakt-Actions laufen auf den aktuellen, Node-24-fähigen
+  Hauptversionen.
 
 ### Geplant
 - Kürzel nicht nur zeigen, sondern umstellen können
