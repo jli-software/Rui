@@ -11,7 +11,7 @@
 #   ./scripts/install-linux.sh --uninstall  alles wieder entfernen
 #
 # Wer Rui nur benutzen und nicht bauen will, braucht dieses Repository nicht:
-#   curl -fsSL https://raw.githubusercontent.com/vikingjunior12/Rui/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/jli-software/Rui/main/install.sh | bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

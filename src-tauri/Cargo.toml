@@ -5,8 +5,8 @@ description = "A lean text editor for snippets and notes"
 authors = ["Jonas Gaiching"]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/vikingjunior12/Rui"
-homepage = "https://github.com/vikingjunior12/Rui"
+repository = "https://github.com/jli-software/Rui"
+homepage = "https://github.com/jli-software/Rui"
 readme = "../README.md"
 keywords = ["editor", "tauri", "notes", "codemirror"]
 

@@ -25,10 +25,12 @@ New-Item -ItemType Directory -Force -Path 'release' | Out-Null
 Copy-Item "$out\rui.exe" 'release\rui.exe' -Force
 $nsis = Get-ChildItem "$out\bundle\nsis\*-setup.exe" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime | Select-Object -Last 1
-if ($nsis) { Copy-Item $nsis.FullName 'release\rui-setup.exe' -Force }
+if (-not $nsis) { throw 'NSIS-Installer fehlt im Tauri-Build' }
+Copy-Item $nsis.FullName 'release\rui-setup.exe' -Force
 $msi = Get-ChildItem "$out\bundle\msi\*.msi" -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime | Select-Object -Last 1
-if ($msi) { Copy-Item $msi.FullName 'release\rui-setup.msi' -Force }
+if (-not $msi) { throw 'MSI-Installer fehlt im Tauri-Build' }
+Copy-Item $msi.FullName 'release\rui-setup.msi' -Force
 
 Write-Host '==> Fertig:'
 Get-ChildItem 'release' | ForEach-Object { Write-Host ('    {0}  ({1:N1} MB)' -f $_.Name, ($_.Length / 1MB)) }

@@ -7,12 +7,13 @@
   "author": "Jonas Gaiching",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vikingjunior12/Rui.git"
+    "url": "https://github.com/jli-software/Rui.git"
   },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "check:version": "node scripts/check-version.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

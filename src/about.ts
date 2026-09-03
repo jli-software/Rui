@@ -15,7 +15,7 @@ import { write as writeClipboard } from "./clipboard";
  * dann auch das, was tatsächlich läuft.
  */
 
-const REPO = "https://github.com/vikingjunior12/Rui";
+const REPO = "https://github.com/jli-software/Rui";
 const CHANGELOG = `${REPO}/blob/main/CHANGELOG.md`;
 
 /**
@@ -68,7 +68,7 @@ export class AboutDialog {
             <dt>Entwickler</dt><dd>jli software</dd>
             <dt>Lizenz</dt><dd>MIT</dd>
             <dt>Quelltext</dt>
-            <dd><button class="link-btn" data-act="repo">github.com/vikingjunior12/Rui</button></dd>
+            <dd><button class="link-btn" data-act="repo">github.com/jli-software/Rui</button></dd>
             <dt>Baut auf</dt><dd class="about-stack">Tauri · CodeMirror 6</dd>
           </dl>
         </div>

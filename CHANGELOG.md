@@ -6,6 +6,25 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
+### Geändert
+- **Das README beschreibt Ruis tatsächliche Produktidee.** Rui ist bewusst ein
+  kleiner, fokussierter Editor für Windows und Linux statt der Behauptung, es
+  gebe zwischen Notepad und einer IDE kaum Alternativen. Die optionale
+  Vim-Steuerung und die mit `Strg+K` erreichbare Lernhilfe stehen jetzt ebenso
+  klar im Vordergrund wie die laufende Übernahme des Omarchy-Themes.
+- **Alle aktiven Projektverweise zeigen auf `jli-software/Rui`.** Badges,
+  Installationsbefehle, Paketmetadaten, der Über-Dialog, Release-Workflow und
+  Changelog-Links verlassen sich nicht mehr auf die Weiterleitung vom früheren
+  GitHub-Namen.
+- **Branches und Pull Requests bekommen eine eigene CI.** Linux prüft
+  TypeScript-Build, Formatierung, Clippy und Rust-Tests; Windows baut das
+  Frontend und führt die plattformspezifisch kompilierten Rust-Tests aus. Eine
+  gemeinsame Prüfung hält ausserdem alle sechs Versionsangaben synchron.
+- Der Release-Workflow arbeitet beim Bauen nur noch mit Leserechten; allein der
+  Veröffentlichungsjob darf Releases schreiben. Der Windows-Build bricht ab,
+  wenn NSIS- oder MSI-Installer fehlen, statt ein unvollständiges Artefaktset
+  hochzuladen.
+
 ### Geplant
 - Kürzel nicht nur zeigen, sondern umstellen können
 - Tabs umsortieren, Kontextmenü („Andere schliessen", „Rechts schliessen")
@@ -351,7 +370,7 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
   braucht das Repository nicht mehr:
 
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/vikingjunior12/Rui/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/jli-software/Rui/main/install.sh | bash
   ```
 
   Das Script holt das neueste Release, entpackt es und hängt Rui an denselben
@@ -901,33 +920,34 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/vikingjunior12/Rui/compare/v0.5.2...HEAD
-[0.5.2]: https://github.com/vikingjunior12/Rui/compare/v0.5.1...v0.5.2
-[0.5.1]: https://github.com/vikingjunior12/Rui/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/vikingjunior12/Rui/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/vikingjunior12/Rui/compare/v0.3.10...v0.4.0
-[0.3.10]: https://github.com/vikingjunior12/Rui/compare/v0.3.9...v0.3.10
-[0.3.9]: https://github.com/vikingjunior12/Rui/compare/v0.3.8...v0.3.9
-[0.3.8]: https://github.com/vikingjunior12/Rui/compare/v0.3.7...v0.3.8
-[0.3.7]: https://github.com/vikingjunior12/Rui/compare/v0.3.6...v0.3.7
-[0.3.6]: https://github.com/vikingjunior12/Rui/compare/v0.3.5...v0.3.6
-[0.3.5]: https://github.com/vikingjunior12/Rui/compare/v0.3.4...v0.3.5
-[0.3.4]: https://github.com/vikingjunior12/Rui/compare/v0.3.3...v0.3.4
-[0.3.3]: https://github.com/vikingjunior12/Rui/compare/v0.3.2...v0.3.3
-[0.3.2]: https://github.com/vikingjunior12/Rui/compare/v0.3.1...v0.3.2
-[0.3.1]: https://github.com/vikingjunior12/Rui/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/vikingjunior12/Rui/compare/v0.2.6...v0.3.0
-[0.2.6]: https://github.com/vikingjunior12/Rui/compare/v0.2.5...v0.2.6
-[0.2.5]: https://github.com/vikingjunior12/Rui/compare/v0.2.4...v0.2.5
-[0.2.4]: https://github.com/vikingjunior12/Rui/compare/v0.2.3...v0.2.4
-[0.2.3]: https://github.com/vikingjunior12/Rui/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/vikingjunior12/Rui/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/vikingjunior12/Rui/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/vikingjunior12/Rui/compare/v0.1.6...v0.2.0
-[0.1.6]: https://github.com/vikingjunior12/Rui/compare/v0.1.5...v0.1.6
-[0.1.5]: https://github.com/vikingjunior12/Rui/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/vikingjunior12/Rui/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/vikingjunior12/Rui/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/vikingjunior12/Rui/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.1
-[0.1.0]: https://github.com/vikingjunior12/Rui/releases/tag/v0.1.0
+[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/jli-software/Rui/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/jli-software/Rui/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/jli-software/Rui/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/jli-software/Rui/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/jli-software/Rui/compare/v0.3.10...v0.4.0
+[0.3.10]: https://github.com/jli-software/Rui/compare/v0.3.9...v0.3.10
+[0.3.9]: https://github.com/jli-software/Rui/compare/v0.3.8...v0.3.9
+[0.3.8]: https://github.com/jli-software/Rui/compare/v0.3.7...v0.3.8
+[0.3.7]: https://github.com/jli-software/Rui/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/jli-software/Rui/compare/v0.3.5...v0.3.6
+[0.3.5]: https://github.com/jli-software/Rui/compare/v0.3.4...v0.3.5
+[0.3.4]: https://github.com/jli-software/Rui/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/jli-software/Rui/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/jli-software/Rui/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/jli-software/Rui/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/jli-software/Rui/compare/v0.2.6...v0.3.0
+[0.2.6]: https://github.com/jli-software/Rui/compare/v0.2.5...v0.2.6
+[0.2.5]: https://github.com/jli-software/Rui/compare/v0.2.4...v0.2.5
+[0.2.4]: https://github.com/jli-software/Rui/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/jli-software/Rui/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/jli-software/Rui/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/jli-software/Rui/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/jli-software/Rui/compare/v0.1.6...v0.2.0
+[0.1.6]: https://github.com/jli-software/Rui/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/jli-software/Rui/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/jli-software/Rui/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/jli-software/Rui/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/jli-software/Rui/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/jli-software/Rui/releases/tag/v0.1.1
+[0.1.0]: https://github.com/jli-software/Rui/releases/tag/v0.1.0

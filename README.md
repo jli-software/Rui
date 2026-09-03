@@ -4,37 +4,43 @@
 
 # Rui
 
-**A small, fast text editor for Windows and Linux**, with Vim keybindings
-you can switch on or leave off.
+**A focused text editor for Windows and Linux**, with optional Vim keybindings
+and a built-in way to learn them.
 
-[![Release](https://img.shields.io/github/v/release/vikingjunior12/Rui?style=flat-square&color=94b489&label=release)](https://github.com/vikingjunior12/Rui/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/vikingjunior12/Rui/release.yml?style=flat-square&color=94b489&label=build)](https://github.com/vikingjunior12/Rui/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/jli-software/Rui?style=flat-square&color=94b489&label=release)](https://github.com/jli-software/Rui/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/jli-software/Rui/release.yml?style=flat-square&color=94b489&label=build)](https://github.com/jli-software/Rui/actions/workflows/release.yml)
 [![Licence](https://img.shields.io/badge/licence-MIT-94b489?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-94b489?style=flat-square)](https://github.com/vikingjunior12/Rui/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-94b489?style=flat-square)](https://github.com/jli-software/Rui/releases)
 
 </div>
 
 ![Rui with a PowerShell script open](assets/screenshots/editor.png)
 
-Windows Notepad was never enough, and there isn't much between it and a full
-IDE. I work on Linux most of the time but need Windows for work, so Rui is
-the same editor on both — a Neovim-style editor in a GUI, Vim keybindings
-off by default. No debugger, no LSP, no completion, no terminal: just a
-place to read and edit a script, a log, or the code an AI agent just handed
-you, before it goes anywhere else.
+Rui is deliberately another text editor. It does not try to replace an IDE or
+win a feature checklist. Its job is smaller: open plain-text files quickly,
+edit them reliably, and feel the same on Windows and Linux.
+
+I built Rui because I wanted one focused editor on both platforms. Windows
+Notepad is too limited for the way I work, while a full IDE is often more than
+I need. I also wanted a practical way to use and learn Vim-style editing
+without making Neovim itself my everyday Windows editor.
+
+That scope is intentional: no debugger, no LSP, no completion and no terminal.
+Rui is a compact place for notes, snippets, scripts, logs and files you want to
+inspect before they go anywhere else.
 
 ## Install
 
 **Linux** — one line, no repository, no root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vikingjunior12/Rui/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jli-software/Rui/main/install.sh | bash
 ```
 
 Installs into your home directory and adds `rui file.txt` to your terminal.
 Remove again with `~/.local/share/rui/install.sh --uninstall`.
 
-**Windows** — from [Releases](https://github.com/vikingjunior12/Rui/releases):
+**Windows** — from [Releases](https://github.com/jli-software/Rui/releases):
 
 | File | What it is |
 |---|---|
@@ -45,18 +51,13 @@ Remove again with `~/.local/share/rui/install.sh --uninstall`.
 Not code-signed, so SmartScreen warns on first launch (*More info* → *Run
 anyway*). macOS is untested.
 
-## Features
+## Focused by design
 
 - Syntax highlighting for 16 languages, loaded on demand
 - Find & replace, go to line, undo/redo, folding, line numbers
 - Command palette (`Ctrl+Shift+P`) instead of a menu bar
 - System clipboard shortcuts, word wrap toggle (`Alt+Z`)
 - Clickable status bar — file name, position, language, encoding
-
-![The shortcut sheet, split into category tabs](assets/screenshots/shortcuts.png)
-
-`Ctrl+K` opens a searchable shortcut sheet, grouped by category — with the
-Vim commands listed too, when Vim mode is on.
 
 ![Quick Open, filtering the notes folder](assets/screenshots/quick-open.png)
 
@@ -70,16 +71,30 @@ Vim commands listed too, when Vim mode is on.
 Every question Rui asks happens inside the window, in Rui's own colours —
 never a system dialog landing somewhere else.
 
+## Vim as an option — and a learning path
+
+Vim mode is off by default. Turn it on when you want it; the normal Rui
+shortcuts keep working alongside it. `Ctrl+K` opens a searchable shortcut
+sheet grouped by modes, movement, editing, search, clipboard and commands, so
+the keybindings are available while you learn them instead of living in a
+separate manual.
+
+![The shortcut sheet, split into category tabs](assets/screenshots/shortcuts.png)
+
 ![Visual line mode, with the mode in the status bar](assets/screenshots/vim.png)
 
-Vim keybindings, off by default: normal, insert, visual and replace mode,
-with the mode shown in the status bar. `:w`, `:wq`, `:tabnew`, `:set number`
-and friends go through Rui's own save and open, so encoding survives them.
+Normal, insert, visual and replace mode are supported, with the current mode
+shown in the status bar. `:w`, `:wq`, `:tabnew`, `:set number` and friends go
+through Rui's own save and open paths, so encoding survives them. The same
+setup works on Windows and Linux.
+
+## At home on Omarchy
+
+Outside Omarchy, Rui's Sage palette follows the system in light and dark mode.
+On [Omarchy](https://omarchy.org), Rui derives its colours from the active
+theme and follows theme changes while it is running.
 
 ![The same editor in the light palette](assets/screenshots/light.png)
-
-Sage palette, light and dark, follows the system — and on Linux, the active
-[Omarchy](https://omarchy.org) theme.
 
 ## Keyboard
 
@@ -102,7 +117,7 @@ alongside Rui's own `Ctrl` shortcuts — `Ctrl+K` shows the full list.
 ## Build
 
 ```bash
-npm install
+npm ci
 npm run tauri dev              # run it
 cd src-tauri && cargo test     # tests
 ```

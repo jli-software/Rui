@@ -2,7 +2,7 @@
 # Installiert Rui für den angemeldeten Benutzer — aus dem neuesten GitHub-Release
 # oder aus einem bereits entpackten Ordner.
 #
-#   curl -fsSL https://raw.githubusercontent.com/vikingjunior12/Rui/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/jli-software/Rui/main/install.sh | bash
 #   curl -fsSL .../install.sh | bash -s -- --version v0.3.7
 #   curl -fsSL .../install.sh | bash -s -- --uninstall
 #
@@ -27,7 +27,7 @@
 # hier passiert, sieht Rui dort als eingehängt, und umgekehrt.
 set -euo pipefail
 
-repo="vikingjunior12/Rui"
+repo="jli-software/Rui"
 asset="rui-linux-x86_64.tar.gz"
 
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -96,7 +96,7 @@ if [[ -z "$quelle" ]]; then
     arch="$(uname -m)"
     if [[ "$arch" != "x86_64" ]]; then
         echo "Fertige Builds gibt es nur für x86_64, hier läuft $arch." >&2
-        echo "Aus den Quellen bauen: https://github.com/$repo#build-from-source" >&2
+        echo "Aus den Quellen bauen: https://github.com/$repo#build" >&2
         exit 1
     fi
     command -v curl >/dev/null || { echo "curl wird gebraucht." >&2; exit 1; }

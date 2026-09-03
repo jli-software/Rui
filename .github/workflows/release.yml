@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   linux:
@@ -50,6 +50,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Versionen prüfen
+        run: npm run check:version
+
       - name: Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
@@ -82,6 +85,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Versionen prüfen
+        run: npm run check:version
+
       - name: Bauen
         shell: pwsh
         run: ./scripts/build-release.ps1
@@ -99,12 +105,18 @@ jobs:
     needs: [linux, windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       # Voller Klon: die Release-Notiz kommt aus CHANGELOG.md, der Titel aus
       # der Beschriftung des Tags.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
 
       # checkout legt den Tag als blosses Etikett auf dem Commit an, ohne das
       # annotierte Objekt dahinter — `contents:subject` griffe dann auf die
@@ -127,14 +139,10 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           version="${tag#v}"
 
-          # Stimmt der Tag nicht mit der Version im Projekt überein, ist das
-          # kein Schönheitsfehler: dann trägt die Binary eine andere Nummer
-          # als das Release, unter dem sie liegt.
-          in_conf="$(node -p "require('./package.json').version")"
-          if [ "$version" != "$in_conf" ]; then
-            echo "Tag $tag passt nicht zu package.json ($in_conf)" >&2
-            exit 1
-          fi
+          # Der Tag und alle Stellen, die eine Versionsnummer tragen, müssen
+          # übereinstimmen. Sonst kann das Release anders heissen als Binary,
+          # Installer oder Lockdatei.
+          node scripts/check-version.mjs --tag "$tag"
 
           # Lieber hier hart abbrechen als ein halbes Release veröffentlichen.
           for datei in rui.exe rui-setup.exe rui-setup.msi rui-linux-x86_64.tar.gz; do
@@ -184,7 +192,7 @@ jobs:
           **Linux**
 
           \`\`\`bash
-          curl -fsSL https://raw.githubusercontent.com/vikingjunior12/Rui/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/jli-software/Rui/main/install.sh | bash
           \`\`\`
 
           Then \`rui file.txt\` in a terminal, or *Rui* in the application launcher.
