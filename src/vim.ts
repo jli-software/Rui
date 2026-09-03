@@ -43,6 +43,8 @@ export interface VimHost {
    * ohne Dateinamen fragt Rui nach dem Ort.
    */
   write: (target?: string) => Promise<boolean>;
+  /** `:wq`/`:x` — Ursprungspuffer speichern und genau diesen schließen. */
+  writeAndQuit: (target?: string) => void;
   /** `:e <pfad>` — öffnet eine Datei; ohne Argument lädt es die aktuelle neu. */
   edit: (target: string | undefined, force: boolean) => Promise<void>;
   /**
@@ -274,15 +276,9 @@ function target(params: ExParams): string | undefined {
  * Puffer einen Namen zu geben — genau wie in NeoVim.
  */
 function defineExCommands(host: VimHost) {
-  const writeThenQuit = async (params: ExParams) => {
-    // Nur schliessen, wenn das Speichern wirklich geklappt hat — sonst
-    // wäre der Text weg, weil der Nutzer den Dialog abgebrochen hat.
-    if (await host.write(target(params))) host.quit(false);
-  };
-
   Vim.defineEx("write", "w", (_cm, params) => void host.write(target(params)));
-  Vim.defineEx("wq", "wq", (_cm, params) => void writeThenQuit(params));
-  Vim.defineEx("xit", "x", (_cm, params) => void writeThenQuit(params));
+  Vim.defineEx("wq", "wq", (_cm, params) => host.writeAndQuit(target(params)));
+  Vim.defineEx("xit", "x", (_cm, params) => host.writeAndQuit(target(params)));
   // `:saveas` benennt den Puffer um — in Rui dasselbe wie `:w <name>`,
   // weil ein geschriebener Puffer immer der geschriebenen Datei folgt.
   Vim.defineEx("saveas", "sav", (_cm, params) => void host.write(target(params)));

@@ -6,18 +6,53 @@
 //! schreibt der Editor stillschweigend fremde Dateien um.
 
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
 use chrono::{Local, TimeZone};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::settings::NoteDateFormat;
 
 /// Ab dieser Grösse wird nachgefragt, bevor geöffnet wird. Der Puffer lebt
 /// im Webview, darüber wird das Tippgefühl spürbar zäh.
 const LARGE_FILE_BYTES: u64 = 25 * 1024 * 1024;
+
+/// Serialisiert den kurzen Bereich zwischen Versionsprüfung und Commit.
+/// Eindeutige Temp-Dateien verhindern zwar gemischte Inhalte; erst dieses
+/// Lock sorgt aber dafür, dass zwei Rui-Saves mit derselben Ausgangsversion
+/// nicht beide erfolgreich sein können.
+static SAVE_LOCK: Mutex<()> = Mutex::new(());
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileVersion {
+    pub modified_secs: u64,
+    pub modified_nanos: u32,
+    pub len: u64,
+    #[serde(default)]
+    pub metadata: u32,
+    #[serde(default)]
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum SavePrecondition {
+    Unchanged { version: FileVersion },
+    Missing,
+    Any,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveOutcome {
+    pub mtime_ms: u64,
+    pub version: FileVersion,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -89,15 +124,70 @@ pub struct Document {
     pub read_only: bool,
     /// mtime in Millisekunden, um externe Änderungen zu erkennen.
     pub mtime_ms: u64,
+    /// Hochauflösende Metadaten plus SHA-256 für Save-Konflikte.
+    pub version: FileVersion,
 }
 
-fn mtime_ms(path: &Path) -> u64 {
-    fs::metadata(path)
-        .and_then(|m| m.modified())
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
+fn version_from_metadata(meta: &fs::Metadata) -> Result<FileVersion, String> {
+    let modified = meta
+        .modified()
+        .map_err(|e| format!("Änderungszeit nicht lesbar: {e}"))?
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| format!("Ungültige Änderungszeit: {e}"))?;
+    Ok(FileVersion {
+        modified_secs: modified.as_secs(),
+        modified_nanos: modified.subsec_nanos(),
+        len: meta.len(),
+        metadata: metadata_marker(meta),
+        fingerprint: String::new(),
+    })
+}
+
+#[cfg(unix)]
+fn metadata_marker(meta: &fs::Metadata) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    meta.permissions().mode()
+}
+
+#[cfg(windows)]
+fn metadata_marker(meta: &fs::Metadata) -> u32 {
+    use std::os::windows::fs::MetadataExt;
+    meta.file_attributes()
+}
+
+#[cfg(not(any(unix, windows)))]
+fn metadata_marker(_meta: &fs::Metadata) -> u32 {
+    0
+}
+
+fn file_version(path: &Path) -> Result<FileVersion, String> {
+    let mut file = fs::File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let before = version_from_metadata(
+        &file
+            .metadata()
+            .map_err(|e| format!("{}: {e}", path.display()))?,
+    )?;
+    let mut bytes = Vec::with_capacity(before.len.min(usize::MAX as u64) as usize);
+    file.read_to_end(&mut bytes)
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut after = version_from_metadata(
+        &file
+            .metadata()
+            .map_err(|e| format!("{}: {e}", path.display()))?,
+    )?;
+    if before != after {
+        return Err("FILE_CHANGED_DURING_READ".to_string());
+    }
+    after.fingerprint = fingerprint(&bytes);
+    Ok(after)
+}
+
+fn fingerprint(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn mtime_ms(version: &FileVersion) -> u64 {
+    version.modified_secs.saturating_mul(1000) + u64::from(version.modified_nanos / 1_000_000)
 }
 
 /// Erkennt das Encoding: erst BOM, dann statistisches Raten.
@@ -121,7 +211,8 @@ fn decode(bytes: &[u8]) -> (String, &'static encoding_rs::Encoding, bool) {
 #[tauri::command]
 pub fn open_file(path: String, force: bool) -> Result<Document, String> {
     let path_buf = PathBuf::from(&path);
-    let meta = fs::metadata(&path_buf).map_err(|e| format!("{path}: {e}"))?;
+    let mut file = fs::File::open(&path_buf).map_err(|e| format!("{path}: {e}"))?;
+    let meta = file.metadata().map_err(|e| format!("{path}: {e}"))?;
 
     if meta.is_dir() {
         return Err(format!("{path} ist ein Verzeichnis."));
@@ -131,7 +222,16 @@ pub fn open_file(path: String, force: bool) -> Result<Document, String> {
         return Err(format!("LARGE_FILE:{}", meta.len()));
     }
 
-    let bytes = fs::read(&path_buf).map_err(|e| format!("{path}: {e}"))?;
+    let before = version_from_metadata(&meta)?;
+    let mut bytes = Vec::with_capacity(meta.len().min(usize::MAX as u64) as usize);
+    file.read_to_end(&mut bytes)
+        .map_err(|e| format!("{path}: {e}"))?;
+    let after_meta = file.metadata().map_err(|e| format!("{path}: {e}"))?;
+    let mut version = version_from_metadata(&after_meta)?;
+    if before != version {
+        return Err("FILE_CHANGED_DURING_READ".to_string());
+    }
+    version.fingerprint = fingerprint(&bytes);
     let (raw, encoding, bom) = decode(&bytes);
     let line_ending = LineEnding::detect(&raw);
 
@@ -144,8 +244,9 @@ pub fn open_file(path: String, force: bool) -> Result<Document, String> {
         encoding: encoding.name().to_string(),
         bom,
         line_ending,
-        read_only: meta.permissions().readonly(),
-        mtime_ms: mtime_ms(&path_buf),
+        read_only: after_meta.permissions().readonly(),
+        mtime_ms: mtime_ms(&version),
+        version,
     })
 }
 
@@ -164,6 +265,9 @@ fn encode_with_endings(
 
     let enc = encoding_rs::Encoding::for_label(encoding.as_bytes())
         .ok_or_else(|| format!("Unbekanntes Encoding: {encoding}"))?;
+    if bom && !matches!(enc.name(), "UTF-8" | "UTF-16LE" | "UTF-16BE") {
+        return Err(format!("{} unterstützt keine Byte Order Mark.", enc.name()));
+    }
     let (encoded, _, had_errors) = enc.encode(&with_endings);
     if had_errors {
         return Err(format!(
@@ -185,29 +289,169 @@ fn encode_with_endings(
     Ok(out)
 }
 
-/// Erst in eine Nachbardatei schreiben, dann umbenennen: ein Absturz mitten
-/// im Schreiben darf das Original nicht zerstören. Das Rename muss im
-/// selben Verzeichnis passieren, sonst ist es nicht atomar.
-fn write_atomic(path_buf: &Path, bytes: &[u8]) -> Result<u64, String> {
-    let dir = path_buf.parent().unwrap_or_else(|| Path::new("."));
-    let file_name = path_buf
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "unbenannt".to_string());
-    let tmp = dir.join(format!(".{file_name}.rui-tmp"));
+/// Löst nur den letzten Symlink auf. So bleibt der Link selbst bestehen und
+/// Rui ersetzt die Datei, auf die er zeigt. Auch ein relativer oder noch
+/// dangling Link bekommt dieselbe Semantik wie ein normaler Schreibzugriff.
+fn final_write_target(path: &Path) -> Result<PathBuf, String> {
+    let mut current = path.to_path_buf();
+    for _ in 0..40 {
+        match fs::symlink_metadata(&current) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                let link =
+                    fs::read_link(&current).map_err(|e| format!("{}: {e}", current.display()))?;
+                current = if link.is_absolute() {
+                    link
+                } else {
+                    current
+                        .parent()
+                        .unwrap_or_else(|| Path::new("."))
+                        .join(link)
+                };
+            }
+            Ok(meta) if meta.is_dir() => {
+                return Err(format!("{} ist ein Verzeichnis.", current.display()));
+            }
+            Ok(_) => return Ok(current),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(current),
+            Err(e) => return Err(format!("{}: {e}", current.display())),
+        }
+    }
+    Err(format!("{}: zu viele Symlink-Ebenen.", path.display()))
+}
 
-    {
-        let mut f = fs::File::create(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
-        f.write_all(bytes).map_err(|e| e.to_string())?;
-        f.sync_all().map_err(|e| e.to_string())?;
+fn verify_precondition(path: &Path, precondition: &SavePrecondition) -> Result<bool, String> {
+    if matches!(precondition, SavePrecondition::Any) {
+        return match fs::metadata(path) {
+            Ok(_) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(format!("{}: {e}", path.display())),
+        };
+    }
+    let actual = match fs::metadata(path) {
+        Ok(_) => Some(file_version(path)?),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    let valid = match precondition {
+        SavePrecondition::Unchanged { version } => actual.as_ref() == Some(version),
+        SavePrecondition::Missing => actual.is_none(),
+        SavePrecondition::Any => unreachable!(),
+    };
+    if !valid {
+        return Err("FILE_CHANGED".to_string());
+    }
+    Ok(actual.is_some())
+}
+
+#[cfg(windows)]
+fn commit_temp(temp: &Path, target: &Path, target_exists: bool) -> std::io::Result<()> {
+    use std::iter::once;
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        MoveFileExW, ReplaceFileW, SetFileAttributesW, FILE_ATTRIBUTE_NORMAL,
+        MOVEFILE_WRITE_THROUGH,
+    };
+
+    let temp_w: Vec<u16> = temp.as_os_str().encode_wide().chain(once(0)).collect();
+    let target_w: Vec<u16> = target.as_os_str().encode_wide().chain(once(0)).collect();
+    unsafe {
+        if SetFileAttributesW(temp_w.as_ptr(), FILE_ATTRIBUTE_NORMAL) == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let ok = if target_exists {
+            ReplaceFileW(
+                target_w.as_ptr(),
+                temp_w.as_ptr(),
+                std::ptr::null(),
+                0,
+                std::ptr::null(),
+                std::ptr::null(),
+            )
+        } else {
+            MoveFileExW(temp_w.as_ptr(), target_w.as_ptr(), MOVEFILE_WRITE_THROUGH)
+        };
+        if ok == 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn commit_temp(temp: &Path, target: &Path, target_exists: bool) -> std::io::Result<()> {
+    if target_exists {
+        fs::rename(temp, target)
+    } else {
+        // Der globale Rui-Lock schliesst interne Rennen. Ein externer
+        // Prozess könnte nach der Prüfung dennoch ein Ziel anlegen; ein
+        // Hardlink-Commit verhindert, dass wir es dabei überschreiben.
+        fs::hard_link(temp, target)?;
+        let _ = fs::remove_file(temp);
+        Ok(())
+    }
+}
+
+/// Erst in eine eindeutige Nachbardatei schreiben, dann plattformgerecht
+/// ersetzen. Die Ausgangsversion wird unmittelbar vor dem Commit geprüft.
+pub(crate) fn write_atomic(
+    path: &Path,
+    bytes: &[u8],
+    precondition: SavePrecondition,
+) -> Result<SaveOutcome, String> {
+    let _guard = SAVE_LOCK
+        .lock()
+        .map_err(|_| "Interne Speichersperre ist beschädigt.".to_string())?;
+    let target = final_write_target(path)?;
+    let dir = target.parent().unwrap_or_else(|| Path::new("."));
+    let old_meta = fs::metadata(&target).ok();
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(".rui-").suffix(".tmp");
+    #[cfg(unix)]
+    if old_meta.is_none() {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(fs::Permissions::from_mode(0o666));
+    }
+    let mut temp = builder
+        .tempfile_in(dir)
+        .map_err(|e| format!("{}: {e}", dir.display()))?;
+
+    temp.write_all(bytes).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    if let Some(meta) = &old_meta {
+        temp.as_file()
+            .set_permissions(meta.permissions())
+            .map_err(|e| format!("Dateirechte konnten nicht übernommen werden: {e}"))?;
+    }
+    temp.as_file().sync_all().map_err(|e| e.to_string())?;
+    let mut committed_version = version_from_metadata(
+        &temp
+            .as_file()
+            .metadata()
+            .map_err(|e| format!("Temp-Datei nicht prüfbar: {e}"))?,
+    )?;
+    committed_version.fingerprint = fingerprint(bytes);
+
+    let target_exists = verify_precondition(&target, &precondition)?;
+    let temp_path = temp.into_temp_path();
+    commit_temp(temp_path.as_ref(), &target, target_exists)
+        .map_err(|e| format!("{}: {e}", target.display()))?;
+
+    #[cfg(unix)]
+    if let Ok(folder) = fs::File::open(dir) {
+        // Einige Dateisysteme unterstützen fsync auf Ordnern nicht. Der
+        // Datei-Commit ist dann trotzdem erfolgt; daraus darf kein falscher
+        // Eindruck eines ungeschriebenen Puffers entstehen.
+        let _ = folder.sync_all();
     }
 
-    fs::rename(&tmp, path_buf).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        format!("{}: {e}", path_buf.display())
-    })?;
-
-    Ok(mtime_ms(path_buf))
+    // Nach dem Commit darf ein Fehler beim erneuten Stat nicht als
+    // fehlgeschlagener Write erscheinen: Die Datei ist bereits ersetzt.
+    let version = file_version(&target).unwrap_or(committed_version);
+    Ok(SaveOutcome {
+        mtime_ms: mtime_ms(&version),
+        version,
+    })
 }
 
 #[tauri::command]
@@ -217,10 +461,11 @@ pub fn save_file(
     encoding: String,
     bom: bool,
     line_ending: LineEnding,
-) -> Result<u64, String> {
+    precondition: SavePrecondition,
+) -> Result<SaveOutcome, String> {
     let path_buf = PathBuf::from(&path);
     let bytes = encode_with_endings(content, &encoding, bom, line_ending)?;
-    write_atomic(&path_buf, &bytes)
+    write_atomic(&path_buf, &bytes, precondition)
 }
 
 /// Zeichen, die auf Windows, macOS oder Linux in Dateinamen verboten sind
@@ -291,6 +536,7 @@ fn unique_note_path(folder: &Path, stem: &str, ext: &str, keep: Option<&Path>) -
 pub struct NoteSaveResult {
     pub path: String,
     pub mtime_ms: u64,
+    pub version: FileVersion,
 }
 
 /// Legt einen noch namenlosen Puffer im Notizen-Ordner ab.
@@ -329,11 +575,12 @@ pub fn save_note(
     let target = unique_note_path(&folder_buf, &stem, &extension, None);
 
     let bytes = encode_with_endings(content, &encoding, bom, line_ending)?;
-    let mtime_ms = write_atomic(&target, &bytes)?;
+    let outcome = write_atomic(&target, &bytes, SavePrecondition::Missing)?;
 
     Ok(NoteSaveResult {
         path: target.to_string_lossy().into_owned(),
-        mtime_ms,
+        mtime_ms: outcome.mtime_ms,
+        version: outcome.version,
     })
 }
 
@@ -404,7 +651,35 @@ pub fn file_mtime(path: String) -> Result<u64, String> {
     if !p.exists() {
         return Err("MISSING".to_string());
     }
-    Ok(mtime_ms(&p))
+    Ok(mtime_ms(&version_from_metadata(
+        &fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?,
+    )?))
+}
+
+/// Hochauflösende Revision für Konfliktprüfung und Fokus-Überwachung.
+#[tauri::command]
+pub fn current_file_version(path: String) -> Result<FileVersion, String> {
+    let p = PathBuf::from(&path);
+    match fs::metadata(&p) {
+        Ok(_) => file_version(&p),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err("MISSING".to_string()),
+        Err(e) => Err(format!("{path}: {e}")),
+    }
+}
+
+/// Prüft vorhandene Ziele nach kanonischem Pfad. Das verhindert, dass
+/// Speichern unter über einen Symlink einen zweiten schreibbaren Tab für
+/// dieselbe Datei erzeugt.
+#[tauri::command]
+pub fn same_file(first: String, second: String) -> Result<bool, String> {
+    let a = fs::canonicalize(&first).map_err(|e| format!("{first}: {e}"))?;
+    let b = fs::canonicalize(&second).map_err(|e| format!("{second}: {e}"))?;
+    #[cfg(windows)]
+    return Ok(a
+        .to_string_lossy()
+        .eq_ignore_ascii_case(&b.to_string_lossy()));
+    #[cfg(not(windows))]
+    Ok(a == b)
 }
 
 /// Ergebnis des Umbenennens: der neue Pfad und die Zeit, die die Datei
@@ -418,6 +693,7 @@ pub fn file_mtime(path: String) -> Result<u64, String> {
 pub struct Renamed {
     pub path: String,
     pub mtime_ms: u64,
+    pub version: FileVersion,
 }
 
 /// Benennt eine Datei im selben Ordner um.
@@ -428,7 +704,11 @@ pub struct Renamed {
 /// überschrieben; das ist der Fall, in dem ein Vertipper sonst zwei
 /// Dateien zu einer macht.
 #[tauri::command]
-pub fn rename_file(path: String, name: String) -> Result<Renamed, String> {
+pub fn rename_file(
+    path: String,
+    name: String,
+    expected_version: FileVersion,
+) -> Result<Renamed, String> {
     let name = name.trim();
     if name.is_empty() {
         return Err("Der Name darf nicht leer sein.".to_string());
@@ -453,10 +733,19 @@ pub fn rename_file(path: String, name: String) -> Result<Renamed, String> {
         return Err("Der Name darf nicht nur aus Punkten bestehen.".to_string());
     }
 
+    let _guard = SAVE_LOCK
+        .lock()
+        .map_err(|_| "Interne Speichersperre ist beschädigt.".to_string())?;
     let source = PathBuf::from(&path);
     if !source.exists() {
-        return Err(format!("{path}: Datei nicht gefunden."));
+        return Err("FILE_CHANGED".to_string());
     }
+    verify_precondition(
+        &source,
+        &SavePrecondition::Unchanged {
+            version: expected_version.clone(),
+        },
+    )?;
     let folder = source
         .parent()
         .ok_or_else(|| format!("{path}: kein übergeordneter Ordner."))?;
@@ -465,7 +754,8 @@ pub fn rename_file(path: String, name: String) -> Result<Renamed, String> {
     if target == source {
         return Ok(Renamed {
             path,
-            mtime_ms: mtime_ms(&source),
+            mtime_ms: mtime_ms(&expected_version),
+            version: expected_version,
         });
     }
     // `exists()` statt einfach umbenennen: `fs::rename` überschreibt unter
@@ -480,13 +770,184 @@ pub fn rename_file(path: String, name: String) -> Result<Renamed, String> {
     fs::rename(&source, &target).map_err(|e| format!("{path}: {e}"))?;
     Ok(Renamed {
         path: target.to_string_lossy().into_owned(),
-        mtime_ms: mtime_ms(&target),
+        mtime_ms: mtime_ms(&expected_version),
+        version: expected_version,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn temp_reste(dir: &Path) -> Vec<PathBuf> {
+        fs::read_dir(dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.file_name()
+                    .is_some_and(|name| name.to_string_lossy().starts_with(".rui-"))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn atomar_ersetzt_bestehende_datei() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("überraschung.txt");
+        fs::write(&path, "alt").unwrap();
+        let version = file_version(&path).unwrap();
+
+        let result = write_atomic(
+            &path,
+            b"neuer inhalt",
+            SavePrecondition::Unchanged { version },
+        )
+        .unwrap();
+
+        assert_eq!(fs::read(&path).unwrap(), b"neuer inhalt");
+        assert_eq!(result.version, file_version(&path).unwrap());
+        assert!(temp_reste(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn fremde_revision_wird_nicht_ueberschrieben() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("text.txt");
+        fs::write(&path, "basis").unwrap();
+        let expected = file_version(&path).unwrap();
+        fs::write(&path, "fremde und laengere aenderung").unwrap();
+
+        let error = write_atomic(
+            &path,
+            b"rui",
+            SavePrecondition::Unchanged { version: expected },
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "FILE_CHANGED");
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "fremde und laengere aenderung"
+        );
+        assert!(temp_reste(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn fingerprint_erkennt_gleich_lange_aenderung_mit_gleicher_mtime() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("gleich.txt");
+        fs::write(&path, "ABCDE").unwrap();
+        let expected = file_version(&path).unwrap();
+        fs::write(&path, "VWXYZ").unwrap();
+        filetime::set_file_mtime(
+            &path,
+            filetime::FileTime::from_unix_time(
+                expected.modified_secs as i64,
+                expected.modified_nanos,
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(
+            write_atomic(
+                &path,
+                b"RUI!!",
+                SavePrecondition::Unchanged { version: expected },
+            )
+            .unwrap_err(),
+            "FILE_CHANGED"
+        );
+        assert_eq!(fs::read_to_string(path).unwrap(), "VWXYZ");
+    }
+
+    #[test]
+    fn neues_ziel_wird_nicht_ueberschrieben() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("neu.txt");
+        fs::write(&path, "inzwischen angelegt").unwrap();
+
+        assert_eq!(
+            write_atomic(&path, b"rui", SavePrecondition::Missing).unwrap_err(),
+            "FILE_CHANGED"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), "inzwischen angelegt");
+    }
+
+    #[test]
+    fn zwei_saves_mit_gleicher_basis_lassen_nur_einen_durch() {
+        use std::sync::{Arc, Barrier};
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("konkurrenz.txt");
+        fs::write(&path, "basis").unwrap();
+        let version = file_version(&path).unwrap();
+        let barrier = Arc::new(Barrier::new(3));
+
+        let handles: Vec<_> = [b"erste version".as_slice(), b"zweitefassung".as_slice()]
+            .into_iter()
+            .map(|bytes| {
+                let path = path.clone();
+                let barrier = Arc::clone(&barrier);
+                let bytes = bytes.to_vec();
+                let expected = version.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    write_atomic(
+                        &path,
+                        &bytes,
+                        SavePrecondition::Unchanged { version: expected },
+                    )
+                })
+            })
+            .collect();
+        barrier.wait();
+        let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
+        let final_bytes = fs::read(&path).unwrap();
+        assert!(final_bytes == b"erste version" || final_bytes == b"zweitefassung");
+        assert!(temp_reste(dir.path()).is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_rechte_und_symlink_bleiben_erhalten() {
+        use std::os::unix::fs::{symlink, MetadataExt, PermissionsExt};
+
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("ziel.txt");
+        let link = dir.path().join("link.txt");
+        fs::write(&target, "alt").unwrap();
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o751)).unwrap();
+        symlink("ziel.txt", &link).unwrap();
+        let version = file_version(&link).unwrap();
+
+        write_atomic(&link, b"neu", SavePrecondition::Unchanged { version }).unwrap();
+
+        assert!(fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "neu");
+        assert_eq!(fs::metadata(&target).unwrap().mode() & 0o7777, 0o751);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn neue_datei_respektiert_umask_wie_file_create() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let referenz = dir.path().join("referenz.txt");
+        let neu = dir.path().join("neu.txt");
+        fs::write(&referenz, "x").unwrap();
+        write_atomic(&neu, b"x", SavePrecondition::Missing).unwrap();
+
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&neu), mode(&referenz));
+    }
 
     #[test]
     fn erkennt_dominantes_zeilenende() {
@@ -517,6 +978,16 @@ mod tests {
         let (back, _, errors) = enc.encode(&text);
         assert!(!errors);
         assert_eq!(back.as_ref(), &bytes);
+    }
+
+    #[test]
+    fn bom_wird_nur_fuer_passende_encodings_akzeptiert() {
+        assert!(encode_with_endings("text".into(), "UTF-8", true, LineEnding::Lf).is_ok());
+        assert!(
+            encode_with_endings("text".into(), "windows-1252", true, LineEnding::Lf)
+                .unwrap_err()
+                .contains("keine Byte Order Mark")
+        );
     }
 
     /// Ein fester Zeitpunkt in Lokalzeit, damit die Tests in jeder
@@ -607,30 +1078,58 @@ mod tests {
         let quelle = dir.join("alt.txt");
         fs::write(&quelle, "inhalt").unwrap();
         let pfad = quelle.to_string_lossy().into_owned();
+        let version = file_version(&quelle).unwrap();
 
-        let neu = rename_file(pfad.clone(), "neu.ps1".into()).unwrap();
+        let neu = rename_file(pfad.clone(), "neu.ps1".into(), version).unwrap();
         assert_eq!(PathBuf::from(&neu.path).parent().unwrap(), dir.as_path());
         assert!(neu.path.ends_with("neu.ps1"));
         assert!(!quelle.exists());
         assert_eq!(fs::read_to_string(&neu.path).unwrap(), "inhalt");
 
         // Ein Pfad im Namen würde die Datei verschieben — das tut Umbenennen nicht.
-        assert!(rename_file(neu.path.clone(), "unten/x.txt".into()).is_err());
-        assert!(rename_file(neu.path.clone(), "  ".into()).is_err());
+        assert!(rename_file(neu.path.clone(), "unten/x.txt".into(), neu.version.clone()).is_err());
+        assert!(rename_file(neu.path.clone(), "  ".into(), neu.version.clone()).is_err());
         // Unsichtbares und Punkte-Namen ebenso: beides sieht man dem
         // Eingabefeld nicht an, wenn es einmal drinsteht.
-        assert!(rename_file(neu.path.clone(), "mit\u{7f}steuerzeichen.md".into()).is_err());
-        assert!(rename_file(neu.path.clone(), "..".into()).is_err());
+        assert!(rename_file(
+            neu.path.clone(),
+            "mit\u{7f}steuerzeichen.md".into(),
+            neu.version.clone(),
+        )
+        .is_err());
+        assert!(rename_file(neu.path.clone(), "..".into(), neu.version.clone()).is_err());
 
         // Und ein belegter Name darf die andere Datei nicht schlucken.
         fs::write(dir.join("besetzt.txt"), "fremd").unwrap();
-        assert!(rename_file(neu.path.clone(), "besetzt.txt".into()).is_err());
+        assert!(rename_file(neu.path.clone(), "besetzt.txt".into(), neu.version).is_err());
         assert_eq!(
             fs::read_to_string(dir.join("besetzt.txt")).unwrap(),
             "fremd"
         );
 
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn umbenennen_lehnt_fremde_aenderung_ab() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("alt.txt");
+        fs::write(&source, "basis").unwrap();
+        let expected = file_version(&source).unwrap();
+        fs::write(&source, "extern und laenger").unwrap();
+
+        assert_eq!(
+            rename_file(
+                source.to_string_lossy().into_owned(),
+                "neu.txt".into(),
+                expected,
+            )
+            .unwrap_err(),
+            "FILE_CHANGED"
+        );
+        assert!(source.exists());
+        assert!(!dir.path().join("neu.txt").exists());
+        assert_eq!(fs::read_to_string(source).unwrap(), "extern und laenger");
     }
 
     #[test]

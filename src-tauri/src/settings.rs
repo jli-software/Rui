@@ -7,13 +7,13 @@
 //! Config-Datei zu ersticken.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
 use crate::decoration::DecorationMode;
-use crate::document::LineEnding;
+use crate::document::{write_atomic, FileVersion, LineEnding, SavePrecondition};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -214,6 +214,9 @@ pub struct TabSession {
     pub encoding: Option<String>,
     pub line_ending: Option<LineEnding>,
     pub bom: bool,
+    /// Revision, auf der ungespeicherte Inhalte beruhen. So erkennt Rui
+    /// Änderungen, die während eines geschlossenen Fensters passiert sind.
+    pub base_version: Option<FileVersion>,
     /// Entstehungszeit des Puffers (Epoche in ms). Ohne sie bekäme ein
     /// gestern angelegter, noch namenloser Puffer nach dem Neustart das
     /// heutige Datum in den Dateinamen.
@@ -266,9 +269,12 @@ fn read_json<T: Default + for<'de> Deserialize<'de>>(path: &PathBuf) -> T {
         .unwrap_or_default()
 }
 
-fn write_json<T: Serialize>(path: &PathBuf, value: &T) -> Result<(), String> {
+fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
+    if fs::metadata(path).is_ok_and(|meta| meta.permissions().readonly()) {
+        return Err(format!("{} ist schreibgeschützt.", path.display()));
+    }
     let json = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
-    fs::write(path, json).map_err(|e| format!("{}: {e}", path.display()))
+    write_atomic(path, json.as_bytes(), SavePrecondition::Any).map(|_| ())
 }
 
 #[tauri::command]

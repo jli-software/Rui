@@ -30,11 +30,14 @@ import {
 import type {
   Buffer,
   DecorationMode,
+  FileVersion,
   LineEnding,
   LoadedDocument,
   OmarchyColors,
   QuickOpenFile,
   RenameResult,
+  SaveOutcome,
+  SavePrecondition,
   ResolvedDecoration,
   Session,
   Settings,
@@ -53,6 +56,7 @@ const ENCODINGS = ["UTF-8", "windows-1252", "ISO-8859-1", "UTF-16LE", "UTF-16BE"
  * `:e` es tut.
  */
 type OpenTarget = "tab" | "current";
+type SaveTarget = { precondition: SavePrecondition; sameAsBuffer: boolean };
 
 /**
  * Welche Einstellung hinter welcher `:set`-Option steckt.
@@ -96,6 +100,10 @@ class App {
   private autosaveTimer: number | undefined;
   /** Ob ein Autosave aussteht — der Tabwechsel muss ihn vorher ausführen. */
   private autosavePending = false;
+  /** Datei-Saves laufen geordnet; dadurch kann kein älterer Save zuletzt gewinnen. */
+  private saveQueue: Promise<void> = Promise.resolve();
+  /** Dasselbe gilt für gedrosselte und finale Session-Snapshots. */
+  private sessionQueue: Promise<boolean> = Promise.resolve(true);
   private closing = false;
 
   async start() {
@@ -115,6 +123,7 @@ class App {
         // `:w`, `:e` und `:q` laufen über Ruis eigene Wege — sonst schriebe
         // Vim an `document.rs` vorbei und damit am Encoding der Datei.
         write: (target) => this.save(target),
+        writeAndQuit: (target) => void this.saveAndQuit(target),
         edit: (target, force) => this.edit(target, force),
         quit: (force) => void this.quit(force),
         quitAll: (force) => void this.quitAll(force),
@@ -254,7 +263,14 @@ class App {
   }
 
   private isModifiedTab(tab: Tab): boolean {
-    return this.contentOf(tab) !== tab.buffer.savedContent;
+    const buffer = tab.buffer;
+    return (
+      this.contentOf(tab) !== buffer.savedContent ||
+      buffer.encoding !== buffer.savedEncoding ||
+      buffer.bom !== buffer.savedBom ||
+      buffer.lineEnding !== buffer.savedLineEnding ||
+      buffer.externalVersion !== null
+    );
   }
 
   /** Ein leerer Tab mit dem Zustand, der gerade im Editor steht. */
@@ -351,7 +367,7 @@ class App {
       languageOverride: init.languageOverride ?? null,
       state: this.editor.freshState(init.content),
       scrollTop: 0,
-      modified: init.content !== init.buffer.savedContent,
+      modified: this.isModifiedBuffer(init.buffer, init.content),
     };
     const at = this.tabs.length === 0 ? 0 : this.activeIndex + 1;
     this.tabs.splice(at, 0, tab);
@@ -372,6 +388,7 @@ class App {
    * bei eingeschalteter Sitzungswiederherstellung gefragt.
    */
   private async closeTab(id: number, force = false): Promise<boolean> {
+    await this.saveQueue;
     let index = this.indexOf(id);
     if (index < 0) return false;
     const tab = this.tabs[index];
@@ -432,30 +449,50 @@ class App {
    * ein namenloser Puffer ohnehin bekäme.
    */
   private async renameTab(id: number, name: string) {
+    await this.flushAutosave();
     const index = this.indexOf(id);
     if (index < 0) return;
     // Umbenannt wird nur, was auch sichtbar ist: `setLanguage` und das
     // Speichern arbeiten beide auf dem aktiven Reiter.
     await this.activate(index);
     const tab = this.tab;
+    await this.enqueueSave(() => this.renameCurrentTab(tab, name));
+  }
+
+  private async renameCurrentTab(tab: Tab, name: string) {
+    if (this.indexOf(tab.id) < 0) return;
     const path = tab.buffer.path;
 
     if (!path) {
-      if (this.settings.notesFolder) await this.saveTo(name);
-      else await this.saveAs(name);
+      if (this.settings.notesFolder) await this.saveTo(tab, name);
+      else await this.saveAs(tab, name);
       return;
     }
 
+    if (!tab.buffer.version || tab.buffer.externalVersion) {
+      await alertDialog(
+        "Die Datei wurde ausserhalb von Rui geändert. Löse den Konflikt vor dem Umbenennen.",
+        { title: "Umbenennen fehlgeschlagen" },
+      );
+      return;
+    }
+    const expectedVersion = tab.buffer.version;
+
     try {
-      const renamed = await invoke<RenameResult>("rename_file", { path, name });
+      const renamed = await invoke<RenameResult>("rename_file", { path, name, expectedVersion });
       tab.buffer.path = renamed.path;
       // Die neue `mtime` muss mit: Sonst hält die Prüfung auf fremde
       // Änderungen die eigene Umbenennung für einen fremden Zugriff und
       // fragt beim nächsten Fokuswechsel, ob neu geladen werden soll.
       tab.buffer.mtimeMs = renamed.mtimeMs;
-      if (!tab.languageOverride) await this.setLanguage(detectLanguage(renamed.path));
+      tab.buffer.version = renamed.version;
+      if (!tab.languageOverride) await this.setTabLanguage(tab, detectLanguage(renamed.path));
       this.status.flash(`Umbenannt in „${shortName(renamed.path)}"`);
     } catch (err) {
+      if (String(err).includes("FILE_CHANGED")) {
+        tab.buffer.externalVersion = await this.conflictVersion(path);
+        this.refreshTab(tab);
+      }
       await alertDialog(String(err), { title: "Umbenennen fehlgeschlagen" });
     }
     this.refreshStatus();
@@ -470,27 +507,33 @@ class App {
       lineEnding: this.settings.defaultLineEnding,
       readOnly: false,
       mtimeMs: 0,
+      version: null,
+      externalVersion: null,
       savedContent: "",
+      savedEncoding: this.settings.defaultEncoding,
+      savedBom: false,
+      savedLineEnding: this.settings.defaultLineEnding,
       createdAtMs: Date.now(),
     };
   }
 
   private get isModified() {
-    return this.editor.content !== this.buffer.savedContent;
+    return this.isModifiedBuffer(this.buffer, this.editor.content);
+  }
+
+  private isModifiedBuffer(buffer: Buffer, content: string): boolean {
+    return (
+      content !== buffer.savedContent ||
+      buffer.encoding !== buffer.savedEncoding ||
+      buffer.bom !== buffer.savedBom ||
+      buffer.lineEnding !== buffer.savedLineEnding ||
+      buffer.externalVersion !== null
+    );
   }
 
   /** Ob eine Datei schon in einem Tab offen ist. */
   private openTabFor(path: string): number {
     return this.tabs.findIndex((tab) => samePath(tab.buffer.path, path));
-  }
-
-  /**
-   * Ein leerer, unberührter Tab — in den darf eine Datei direkt hinein,
-   * statt einen zweiten aufzumachen und einen unbenutzten stehen zu
-   * lassen.
-   */
-  private get isScratch(): boolean {
-    return !this.buffer.path && !this.isModified;
   }
 
   private get fileName() {
@@ -526,6 +569,14 @@ class App {
     this.tab.language = lang;
     await this.editor.applyLanguage(lang);
     this.refreshStatus();
+  }
+
+  private async setTabLanguage(tab: Tab, lang: LanguageDef) {
+    tab.language = lang;
+    if (tab === this.tab) {
+      await this.editor.applyLanguage(lang);
+      this.refreshStatus();
+    }
   }
 
   // ---- Dateien ----------------------------------------------------------
@@ -572,16 +623,19 @@ class App {
    * ungespeichert ist. Bis 0.3.10 gab es nur einen Puffer, um den es
    * gehen konnte.
    */
-  private async confirmUnsaved(): Promise<boolean> {
-    if (!this.settings.confirmOnClose) return true;
+  private async confirmUnsaved(forcePrompt = false): Promise<boolean> {
+    if (!forcePrompt && !this.settings.confirmOnClose) return true;
     const dirty = this.tabs.filter((tab) => this.isModifiedTab(tab));
     if (dirty.length === 0) return true;
 
     const names = dirty.map((tab) => `„${tabTitle(tab)}"`).join(", ");
-    const text =
+    const detail =
       dirty.length === 1
         ? unsavedText(tabTitle(dirty[0]))
         : `${dirty.length} Tabs enthalten Änderungen, die noch nicht auf der Platte stehen: ${names}.`;
+    const text = forcePrompt
+      ? `Rui konnte die Sitzung nicht sichern. ${detail}`
+      : detail;
     const answer = await this.askUnsaved(
       text,
       dirty.length === 1 ? "Speichern" : "Alle speichern",
@@ -617,8 +671,11 @@ class App {
    * sichtbaren Tab; das ist Vims `:e`.
    */
   async openPath(path: string, options: { force?: boolean; where?: OpenTarget } = {}) {
+    await this.saveQueue;
     const where = options.where ?? "tab";
     const force = options.force ?? false;
+    const origin = this.tab;
+    const originBuffer = origin.buffer;
 
     if (where === "tab") {
       const open = this.openTabFor(path);
@@ -628,34 +685,87 @@ class App {
       }
     }
     if (where === "current" && !force && !(await this.confirmDiscard())) return;
+    const confirmedContent = this.contentOf(origin);
+    const confirmedFormat = {
+      encoding: originBuffer.encoding,
+      bom: originBuffer.bom,
+      lineEnding: originBuffer.lineEnding,
+      externalVersion: originBuffer.externalVersion,
+    };
 
     const doc = await this.readDocument(path, force);
     if (!doc) return;
+    if (this.indexOf(origin.id) < 0 || origin.buffer !== originBuffer) return;
+    const changedWhileLoading =
+      this.contentOf(origin) !== confirmedContent ||
+      originBuffer.encoding !== confirmedFormat.encoding ||
+      originBuffer.bom !== confirmedFormat.bom ||
+      originBuffer.lineEnding !== confirmedFormat.lineEnding ||
+      originBuffer.externalVersion !== confirmedFormat.externalVersion;
+    if (where === "current" && changedWhileLoading) {
+      await alertDialog(
+        "Der Tab wurde während des Ladens geändert und deshalb nicht ersetzt.",
+        { title: "Öffnen abgebrochen" },
+      );
+      return;
+    }
 
-    const buffer: Buffer = {
+    const buffer = this.bufferFromDocument(doc);
+    const language = detectLanguage(doc.path);
+
+    const reusableScratch =
+      where === "tab" &&
+      origin === this.tab &&
+      origin.buffer === originBuffer &&
+      !originBuffer.path &&
+      !this.isModifiedBuffer(originBuffer, this.contentOf(origin));
+    if (where === "tab" && !reusableScratch) {
+      await this.addTab({ buffer, content: doc.content, language });
+      return;
+    }
+
+    await this.replaceTabDocument(origin, buffer, doc.content, language);
+    this.scheduleSessionSave();
+  }
+
+  private bufferFromDocument(doc: LoadedDocument): Buffer {
+    return {
       path: doc.path,
       encoding: doc.encoding,
       bom: doc.bom,
       lineEnding: doc.lineEnding,
       readOnly: doc.readOnly,
       mtimeMs: doc.mtimeMs,
+      version: doc.version,
+      externalVersion: null,
       savedContent: doc.content,
+      savedEncoding: doc.encoding,
+      savedBom: doc.bom,
+      savedLineEnding: doc.lineEnding,
       createdAtMs: Date.now(),
     };
-    const language = detectLanguage(doc.path);
+  }
 
-    if (where === "tab" && !this.isScratch) {
-      await this.addTab({ buffer, content: doc.content, language });
+  private async replaceTabDocument(
+    tab: Tab,
+    buffer: Buffer,
+    content: string,
+    language: LanguageDef,
+  ) {
+    tab.buffer = buffer;
+    tab.languageOverride = null;
+    tab.language = language;
+    tab.modified = false;
+    if (tab !== this.tab) {
+      tab.state = this.editor.freshState(content);
+      tab.scrollTop = 0;
+      this.tabBar.render(this.tabs, this.tab.id);
       return;
     }
-
     this.cancelAutosave();
-    this.tab.buffer = buffer;
-    this.tab.languageOverride = null;
-    this.editor.loadDocument(doc.content);
-    this.editor.setReadOnly(doc.readOnly);
-    await this.setLanguage(language);
-    this.scheduleSessionSave();
+    this.editor.loadDocument(content);
+    this.editor.setReadOnly(buffer.readOnly);
+    await this.setTabLanguage(tab, language);
   }
 
   /**
@@ -693,19 +803,39 @@ class App {
    * Fehler, den Autosave-an-Notizen-Ordner gemacht hat.
    */
   private async save(target?: string): Promise<boolean> {
-    const ok = await this.saveInternal(target);
+    const tab = this.tab;
+    const ok = await this.enqueueSave(() => this.saveInternal(tab, target));
     // Ohne Rückmeldung sagt ein `:w` nichts darüber, ob und wohin
     // geschrieben wurde — bei einem Puffer, der seinen Namen erst beim
     // Speichern bekommt, ist genau das die Frage.
-    if (ok && this.buffer.path) this.status.flash(`„${shortName(this.buffer.path)}" geschrieben`);
+    if (ok && tab.buffer.path) this.status.flash(`„${shortName(tab.buffer.path)}" geschrieben`);
     return ok;
   }
 
-  private saveInternal(target?: string): Promise<boolean> {
-    if (target !== undefined) return this.saveTo(target);
-    if (this.buffer.path) return this.writeTo(this.buffer.path);
-    if (this.settings.notesFolder) return this.saveNote();
-    return this.saveAs();
+  /** `:wq` schliesst den gespeicherten Ursprungstab, auch wenn ein Wechsel wartet. */
+  private async saveAndQuit(target?: string) {
+    const id = this.tab.id;
+    if (!(await this.save(target)) || this.indexOf(id) < 0) return;
+    if (this.tabs.length > 1) await this.closeTab(id);
+    else await this.quitAll(false);
+  }
+
+  private enqueueSave<T>(task: () => Promise<T>): Promise<T> {
+    const result = this.saveQueue.then(task, task);
+    this.saveQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private saveInternal(tab: Tab, target?: string): Promise<boolean> {
+    if (target !== undefined) return this.saveTo(tab, target);
+    if (tab.buffer.path) {
+      return this.writeTo(tab, tab.buffer.path, this.savedPrecondition(tab), true);
+    }
+    if (this.settings.notesFolder) return this.saveNote(tab);
+    return this.saveAs(tab);
   }
 
   /**
@@ -715,12 +845,12 @@ class App {
    * unangetastet liegen. Das ist Vims Verhalten und das erwartbarste:
    * `:w kopie.ps1` soll eine Kopie machen und nichts verschieben.
    */
-  private async saveTo(target: string): Promise<boolean> {
+  private async saveTo(tab: Tab, target: string): Promise<boolean> {
     let path: string;
     try {
       path = await invoke<string>("resolve_save_path", {
         input: target,
-        base: parentFolder(this.buffer.path),
+        base: parentFolder(tab.buffer.path),
         fallback: this.settings.notesFolder,
       });
     } catch (err) {
@@ -730,16 +860,15 @@ class App {
 
     // Eine fremde Datei nicht wortlos überschreiben — `:w!` gibt es in Rui
     // (noch) nicht, also fragt Rui stattdessen.
-    if (path !== this.buffer.path && (await this.exists(path))) {
-      const overwrite = await confirmDialog(
-        `„${shortName(path)}" gibt es bereits. Überschreiben?`,
-        { title: "Speichern", okLabel: "Überschreiben", danger: true },
-      );
-      if (!overwrite) return false;
-    }
-
-    const ok = await this.writeTo(path);
-    if (ok && !this.tab.languageOverride) await this.setLanguage(detectLanguage(path));
+    const targetPlan = await this.targetPrecondition(tab, path);
+    if (!targetPlan) return false;
+    const ok = await this.writeTo(
+      tab,
+      path,
+      targetPlan.precondition,
+      targetPlan.sameAsBuffer,
+    );
+    if (ok && !tab.languageOverride) await this.setTabLanguage(tab, detectLanguage(path));
     return ok;
   }
 
@@ -752,6 +881,81 @@ class App {
     }
   }
 
+  private async currentVersion(path: string): Promise<FileVersion | null> {
+    try {
+      return await invoke<FileVersion>("current_file_version", { path });
+    } catch (err) {
+      if (String(err).includes("MISSING")) return null;
+      throw err;
+    }
+  }
+
+  private async conflictVersion(path: string): Promise<FileVersion | "missing"> {
+    try {
+      return (await this.currentVersion(path)) ?? "missing";
+    } catch (err) {
+      // Unlesbar ist nicht dasselbe wie verschwunden, für die Sicherheit
+      // aber derselbe Zustand: niemals ohne weitere Bestätigung schreiben.
+      console.error("Konfliktrevision konnte nicht gelesen werden:", err);
+      return "missing";
+    }
+  }
+
+  private savedPrecondition(tab: Tab): SavePrecondition {
+    return tab.buffer.version
+      ? { kind: "unchanged", version: tab.buffer.version }
+      : { kind: "missing" };
+  }
+
+  private async targetPrecondition(tab: Tab, path: string): Promise<SaveTarget | null> {
+    if (samePath(tab.buffer.path, path)) {
+      return { precondition: this.savedPrecondition(tab), sameAsBuffer: true };
+    }
+
+    let version: FileVersion | null;
+    try {
+      version = await this.currentVersion(path);
+    } catch (err) {
+      await alertDialog(String(err), { title: "Speichern fehlgeschlagen" });
+      return null;
+    }
+    if (!version) return { precondition: { kind: "missing" }, sameAsBuffer: false };
+
+    if (tab.buffer.path) {
+      const ownFile = await invoke<boolean>("same_file", {
+        first: path,
+        second: tab.buffer.path,
+      }).catch(() => false);
+      if (ownFile) {
+        return { precondition: this.savedPrecondition(tab), sameAsBuffer: true };
+      }
+    }
+
+    for (const other of this.tabs) {
+      if (other === tab || !other.buffer.path) continue;
+      const same = await invoke<boolean>("same_file", {
+        first: path,
+        second: other.buffer.path,
+      }).catch(() => false);
+      if (same) {
+        await alertDialog(
+          `„${shortName(path)}" ist bereits in einem anderen Tab geöffnet.`,
+          { title: "Speichern unter" },
+        );
+        return null;
+      }
+    }
+
+    const overwrite = await confirmDialog(`„${shortName(path)}" gibt es bereits. Überschreiben?`, {
+      title: "Speichern",
+      okLabel: "Überschreiben",
+      danger: true,
+    });
+    return overwrite
+      ? { precondition: { kind: "unchanged", version }, sameAsBuffer: false }
+      : null;
+  }
+
   /**
    * Einen namenlosen Puffer im Notizen-Ordner ablegen.
    *
@@ -760,28 +964,33 @@ class App {
    * die sich beim Tippen selbst umbenennt, ist keine, mit der man
    * arbeiten kann. Wer einen eigenen Namen will: `:w name.ps1`.
    */
-  private async saveNote(): Promise<boolean> {
+  private async saveNote(tab: Tab): Promise<boolean> {
     const folder = this.settings.notesFolder;
-    if (!folder) return this.saveAs();
+    if (!folder) return this.saveAs(tab);
 
-    this.applySaveTransforms();
+    this.applySaveTransforms(tab);
+    const content = this.contentOf(tab);
+    const buffer = tab.buffer;
+    const { encoding, bom, lineEnding, createdAtMs } = buffer;
     try {
-      const result = await invoke<{ path: string; mtimeMs: number }>("save_note", {
-        folder,
-        extension: this.settings.noteExtension,
-        content: this.editor.content,
-        encoding: this.buffer.encoding,
-        bom: this.buffer.bom,
-        lineEnding: this.buffer.lineEnding,
-        dateFormat: this.settings.noteDateFormat,
-        createdAtMs: this.buffer.createdAtMs,
-      });
-      this.buffer.path = result.path;
-      this.buffer.mtimeMs = result.mtimeMs;
-      this.buffer.savedContent = this.editor.content;
-      this.refreshStatus();
+      const result = await invoke<{ path: string; mtimeMs: number; version: FileVersion }>(
+        "save_note",
+        {
+          folder,
+          extension: this.settings.noteExtension,
+          content,
+          encoding,
+          bom,
+          lineEnding,
+          dateFormat: this.settings.noteDateFormat,
+          createdAtMs,
+        },
+      );
+      this.markSaved(tab, buffer, result.path, content, encoding, bom, lineEnding, result);
       this.scheduleSessionSave();
-      if (!this.tab.languageOverride) await this.setLanguage(detectLanguage(result.path));
+      if (tab.buffer === buffer && !tab.languageOverride) {
+        await this.setTabLanguage(tab, detectLanguage(result.path));
+      }
       return true;
     } catch (err) {
       await alertDialog(String(err), { title: "Speichern fehlgeschlagen" });
@@ -789,14 +998,21 @@ class App {
     }
   }
 
-  private async saveAs(suggestion?: string): Promise<boolean> {
+  private async saveAs(tab: Tab, suggestion?: string): Promise<boolean> {
     const target = await saveDialog({
-      defaultPath: suggestion ?? this.buffer.path ?? this.fileName,
+      defaultPath: suggestion ?? tab.buffer.path ?? tabTitle(tab),
       filters: dialogFilters(),
     });
     if (!target) return false;
-    const ok = await this.writeTo(target);
-    if (ok && !this.tab.languageOverride) await this.setLanguage(detectLanguage(target));
+    const targetPlan = await this.targetPrecondition(tab, target);
+    if (!targetPlan) return false;
+    const ok = await this.writeTo(
+      tab,
+      target,
+      targetPlan.precondition,
+      targetPlan.sameAsBuffer,
+    );
+    if (ok && !tab.languageOverride) await this.setTabLanguage(tab, detectLanguage(target));
     return ok;
   }
 
@@ -808,14 +1024,18 @@ class App {
    * etwas, weil der Puffer daneben stehen bleibt.
    */
   private async edit(target: string | undefined, force: boolean, where: OpenTarget = "current") {
+    await this.saveQueue;
+    const origin = this.tab;
+    const originBuffer = origin.buffer;
     if (target === undefined) {
       if (where === "tab") {
         await this.newTab();
         return;
       }
-      if (!this.buffer.path) return;
+      if (!originBuffer.path) return;
       if (!force && !(await this.confirmDiscard())) return;
-      await this.openPath(this.buffer.path, { force: true, where: "current" });
+      if (this.tab !== origin || origin.buffer !== originBuffer) return;
+      await this.openPath(originBuffer.path, { force: true, where: "current" });
       return;
     }
 
@@ -823,7 +1043,7 @@ class App {
     try {
       path = await invoke<string>("resolve_save_path", {
         input: target,
-        base: parentFolder(this.buffer.path),
+        base: parentFolder(originBuffer.path),
         fallback: this.settings.notesFolder,
       });
     } catch (err) {
@@ -831,49 +1051,86 @@ class App {
       return;
     }
 
+    if (this.indexOf(origin.id) < 0 || origin.buffer !== originBuffer) return;
+
     // Wie in Vim: `:e neue-datei.ps1` legt einen Puffer für einen Namen an,
     // den es noch nicht gibt. Geschrieben wird er erst mit `:w`.
     if (!(await this.exists(path))) {
       const buffer: Buffer = { ...this.emptyBuffer(), path };
-      if (where === "tab" && !this.isScratch) {
+      const reusableScratch =
+        origin === this.tab &&
+        origin.buffer === originBuffer &&
+        !originBuffer.path &&
+        !this.isModifiedBuffer(originBuffer, this.contentOf(origin));
+      if (where === "tab" && !reusableScratch) {
         await this.addTab({ buffer, content: "", language: detectLanguage(path) });
         return;
       }
+      if (where === "current" && this.tab !== origin) {
+        await alertDialog("Der aktive Tab hat während des Öffnens gewechselt.", {
+          title: "Öffnen abgebrochen",
+        });
+        return;
+      }
       if (!force && !(await this.confirmDiscard())) return;
-      this.tab.buffer = buffer;
-      this.tab.languageOverride = null;
-      this.editor.loadDocument("");
-      this.editor.setReadOnly(false);
-      await this.setLanguage(detectLanguage(path));
+      await this.replaceTabDocument(origin, buffer, "", detectLanguage(path));
+      return;
+    }
+    if (where === "current" && this.tab !== origin) {
+      await alertDialog("Der aktive Tab hat während des Öffnens gewechselt.", {
+        title: "Öffnen abgebrochen",
+      });
       return;
     }
     await this.openPath(path, { force, where });
   }
 
-  private async writeTo(path: string): Promise<boolean> {
+  private async writeTo(
+    tab: Tab,
+    path: string,
+    precondition: SavePrecondition,
+    sameAsBuffer: boolean,
+  ): Promise<boolean> {
+    if (tab.buffer.readOnly && sameAsBuffer) {
+      await alertDialog(
+        "Die Datei ist schreibgeschützt. Verwende „Speichern unter“ für eine Kopie.",
+        { title: "Speichern fehlgeschlagen" },
+      );
+      return false;
+    }
     // Aufräumen beim Speichern verändert den Text, den der Nutzer sieht.
     // Deshalb passiert es im Editor und nicht still beim Schreiben —
     // so bleibt es sichtbar und mit Strg+Z widerrufbar.
-    this.applySaveTransforms();
-    const content = this.editor.content;
+    this.applySaveTransforms(tab);
+    const content = this.contentOf(tab);
+    const buffer = tab.buffer;
+    const { encoding, bom, lineEnding } = buffer;
 
     try {
-      const mtime = await invoke<number>("save_file", {
+      const outcome = await invoke<SaveOutcome>("save_file", {
         path,
         content,
-        encoding: this.buffer.encoding,
-        bom: this.buffer.bom,
-        lineEnding: this.buffer.lineEnding,
+        encoding,
+        bom,
+        lineEnding,
+        precondition,
       });
-      this.buffer.path = path;
-      this.buffer.savedContent = content;
-      this.buffer.mtimeMs = mtime;
-      this.buffer.readOnly = false;
-      this.refreshStatus();
+      this.markSaved(tab, buffer, path, content, encoding, bom, lineEnding, outcome);
       this.scheduleSessionSave();
       return true;
     } catch (err) {
       const text = String(err);
+      if (text.includes("FILE_CHANGED")) {
+        buffer.externalVersion = await this.conflictVersion(path);
+        if (tab.buffer === buffer) this.refreshTab(tab);
+        const overwrite = await confirmDialog(
+          `„${shortName(path)}" wurde ausserhalb von Rui geändert. Trotzdem überschreiben?`,
+          { title: "Speicherkonflikt", okLabel: "Überschreiben", danger: true },
+        );
+        return overwrite
+          ? this.writeTo(tab, path, { kind: "any" }, sameAsBuffer)
+          : false;
+      }
       // Encoding kann den Text nicht darstellen: UTF-8 anbieten.
       if (text.includes("nicht darstellen kann")) {
         const useUtf8 = await confirmDialog(text, {
@@ -881,8 +1138,8 @@ class App {
           okLabel: "Als UTF-8 speichern",
         });
         if (useUtf8) {
-          this.buffer.encoding = "UTF-8";
-          return this.writeTo(path);
+          tab.buffer.encoding = "UTF-8";
+          return this.writeTo(tab, path, precondition, sameAsBuffer);
         }
         return false;
       }
@@ -891,14 +1148,51 @@ class App {
     }
   }
 
-  private applySaveTransforms() {
+  private markSaved(
+    tab: Tab,
+    buffer: Buffer,
+    path: string,
+    content: string,
+    encoding: string,
+    bom: boolean,
+    lineEnding: LineEnding,
+    outcome: SaveOutcome,
+  ) {
+    buffer.path = path;
+    buffer.savedContent = content;
+    buffer.savedEncoding = encoding;
+    buffer.savedBom = bom;
+    buffer.savedLineEnding = lineEnding;
+    buffer.mtimeMs = outcome.mtimeMs;
+    buffer.version = outcome.version;
+    buffer.externalVersion = null;
+    buffer.readOnly = false;
+    if (tab.buffer === buffer) this.refreshTab(tab);
+  }
+
+  private refreshTab(tab: Tab) {
+    tab.modified = this.isModifiedTab(tab);
+    if (tab === this.tab) this.refreshStatus();
+    else this.tabBar.render(this.tabs, this.tab.id);
+  }
+
+  private applySaveTransforms(tab: Tab) {
     const s = this.settings;
     if (!s.trimTrailingWhitespace && !s.ensureFinalNewline) return;
 
-    let text = this.editor.content;
+    let text = this.contentOf(tab);
     if (s.trimTrailingWhitespace) text = text.replace(/[ \t]+$/gm, "");
     if (s.ensureFinalNewline && text.length > 0 && !text.endsWith("\n")) text += "\n";
-    if (text === this.editor.content) return;
+    if (text === this.contentOf(tab)) return;
+
+    if (tab !== this.tab) {
+      if (tab.state) {
+        tab.state = tab.state.update({
+          changes: { from: 0, to: tab.state.doc.length, insert: text },
+        }).state;
+      }
+      return;
+    }
 
     this.editor.view.dispatch({
       changes: { from: 0, to: this.editor.view.state.doc.length, insert: text },
@@ -912,30 +1206,59 @@ class App {
   /** Meldet, wenn ein anderes Programm die offene Datei verändert hat. */
   private async checkExternalChange() {
     if (!this.settings.watchExternalChanges || !this.buffer.path || this.closing) return;
+    await this.saveQueue;
+    if (!this.settings.watchExternalChanges || !this.buffer.path || this.closing) return;
+    const tab = this.tab;
+    const path = tab.buffer.path;
+    if (!path) return;
 
-    let mtime: number;
+    let version: FileVersion | null;
     try {
-      mtime = await invoke<number>("file_mtime", { path: this.buffer.path });
-    } catch {
-      return; // Datei ist weg — beim nächsten Speichern wird sie neu angelegt.
+      version = await this.currentVersion(path);
+    } catch (err) {
+      console.error("Dateirevision konnte nicht gelesen werden:", err);
+      return;
     }
-    if (mtime === this.buffer.mtimeMs) return;
-
-    // Erst merken, sonst fragt der nächste Fokuswechsel gleich nochmal.
-    this.buffer.mtimeMs = mtime;
+    if (this.indexOf(tab.id) < 0 || tab.buffer.path !== path) return;
+    if (!version) {
+      if (tab.buffer.externalVersion === "missing") return;
+      tab.buffer.externalVersion = "missing";
+      this.refreshTab(tab);
+      this.scheduleSessionSave();
+      await alertDialog(`„${shortName(path)}" wurde ausserhalb von Rui gelöscht. Der Puffer bleibt erhalten.`, {
+        title: "Datei gelöscht",
+      });
+      return;
+    }
+    if (
+      (tab.buffer.version && sameVersion(version, tab.buffer.version)) ||
+      (typeof tab.buffer.externalVersion === "object" &&
+        tab.buffer.externalVersion !== null &&
+        sameVersion(version, tab.buffer.externalVersion))
+    ) {
+      return;
+    }
 
     const reload = await confirmDialog(
-      this.isModified
-        ? `„${this.fileName}" wurde ausserhalb von Rui geändert. Neu laden und die eigenen Änderungen verwerfen?`
-        : `„${this.fileName}" wurde ausserhalb von Rui geändert. Neu laden?`,
+      this.isModifiedTab(tab)
+        ? `„${shortName(path)}" wurde ausserhalb von Rui geändert. Neu laden und die eigenen Änderungen verwerfen?`
+        : `„${shortName(path)}" wurde ausserhalb von Rui geändert. Neu laden?`,
       {
         title: "Datei geändert",
         okLabel: "Neu laden",
         cancelLabel: "Behalten",
-        danger: this.isModified,
+        danger: this.isModifiedTab(tab),
       },
     );
-    if (reload) await this.openPath(this.buffer.path, { force: true, where: "current" });
+    if (this.indexOf(tab.id) < 0 || tab.buffer.path !== path) return;
+    if (reload) {
+      await this.activate(this.indexOf(tab.id));
+      await this.openPath(path, { force: true, where: "current" });
+    } else {
+      tab.buffer.externalVersion = version;
+      this.refreshTab(tab);
+      this.scheduleSessionSave();
+    }
   }
 
   // ---- Autosave ----------------------------------------------------------
@@ -949,13 +1272,14 @@ class App {
    * versehentlicher Tastendruck stand damit sofort auf der Platte.
    */
   private scheduleAutosave() {
-    if (!this.settings.autosave) return;
+    if (!this.settings.autosave || this.closing) return;
     window.clearTimeout(this.autosaveTimer);
     this.autosavePending = true;
-    this.autosaveTimer = window.setTimeout(
-      () => void this.autosave(),
-      this.settings.autosaveDelayMs,
-    );
+    const tab = this.tab;
+    this.autosaveTimer = window.setTimeout(() => {
+      this.autosavePending = false;
+      void this.enqueueSave(() => this.autosave(tab));
+    }, this.settings.autosaveDelayMs);
   }
 
   /** Ein ausstehender Autosave gehörte zu einem Puffer, den es nicht mehr gibt. */
@@ -971,25 +1295,30 @@ class App {
    * Puffer, und nach dem Wechsel wäre das der falsche.
    */
   private async flushAutosave() {
-    if (!this.autosavePending) return;
-    window.clearTimeout(this.autosaveTimer);
-    await this.autosave();
+    if (this.autosavePending) {
+      const tab = this.tab;
+      window.clearTimeout(this.autosaveTimer);
+      this.autosavePending = false;
+      await this.enqueueSave(() => this.autosave(tab));
+    } else {
+      await this.saveQueue;
+    }
   }
 
-  private async autosave() {
-    this.autosavePending = false;
-    if (!this.settings.autosave || this.buffer.readOnly) return;
+  private async autosave(tab: Tab) {
+    if (!this.settings.autosave || tab.buffer.readOnly || tab.buffer.externalVersion) return;
+    if (this.indexOf(tab.id) < 0) return;
 
-    const content = this.editor.content;
-    if (content === this.buffer.savedContent) return;
+    const content = this.contentOf(tab);
+    if (!this.isModifiedBuffer(tab.buffer, content)) return;
 
     // Ein namenloser Puffer bekommt hier keinen Dialog vorgesetzt: Ein
     // Speichern-unter-Fenster, das ungefragt aufspringt, während man
     // tippt, wäre schlimmer als gar kein Autosave. Ohne Notizen-Ordner
     // wartet der Puffer deshalb auf Strg+S.
-    if (!this.buffer.path) {
+    if (!tab.buffer.path) {
       if (!this.settings.notesFolder || content.trim() === "") return;
-      await this.saveNote();
+      await this.saveNote(tab);
       return;
     }
 
@@ -997,17 +1326,27 @@ class App {
     // Text sichtbar und würde mitten im Tippen ein gerade eingegebenes
     // Leerzeichen wieder wegputzen. Das bleibt dem expliziten Speichern
     // vorbehalten.
+    const buffer = tab.buffer;
+    const path = buffer.path;
+    if (!path) return;
+    const { encoding, bom, lineEnding } = buffer;
     try {
-      this.buffer.mtimeMs = await invoke<number>("save_file", {
-        path: this.buffer.path,
+      const outcome = await invoke<SaveOutcome>("save_file", {
+        path,
         content,
-        encoding: this.buffer.encoding,
-        bom: this.buffer.bom,
-        lineEnding: this.buffer.lineEnding,
+        encoding,
+        bom,
+        lineEnding,
+        precondition: this.savedPrecondition(tab),
       });
-      this.buffer.savedContent = content;
-      this.refreshStatus();
+      this.markSaved(tab, buffer, path, content, encoding, bom, lineEnding, outcome);
+      this.scheduleSessionSave();
     } catch (err) {
+      if (String(err).includes("FILE_CHANGED")) {
+        buffer.externalVersion = await this.conflictVersion(path);
+        if (tab.buffer === buffer) this.refreshTab(tab);
+        this.scheduleSessionSave();
+      }
       // Keine Modal-Flut bei jedem Tastendruck — der nächste Tick
       // versucht es erneut, solange sich der Text weiter ändert.
       console.error("Autosave fehlgeschlagen:", err);
@@ -1017,23 +1356,29 @@ class App {
   // ---- Sitzung ----------------------------------------------------------
 
   private scheduleSessionSave() {
-    if (!this.settings.restoreSession) return;
+    if (!this.settings.restoreSession || this.closing) return;
     window.clearTimeout(this.sessionTimer);
     // Gedrosselt: die Sitzung ist ein Sicherheitsnetz, keine Datenbank.
     this.sessionTimer = window.setTimeout(() => void this.saveSession(), 1500);
   }
 
-  private async saveSession() {
-    if (!this.settings.restoreSession) return;
+  private async saveSession(): Promise<boolean> {
+    if (!this.settings.restoreSession) return true;
     const session: Session = {
       tabs: this.tabs.map((tab) => this.sessionFor(tab)),
       active: this.activeIndex,
     };
-    try {
-      await invoke("save_session", { session });
-    } catch {
-      // Eine nicht schreibbare Sitzungsdatei darf nichts blockieren.
-    }
+    const operation = this.sessionQueue.then(async () => {
+      try {
+        await invoke("save_session", { session });
+        return true;
+      } catch (err) {
+        console.error("Sitzung konnte nicht gespeichert werden:", err);
+        return false;
+      }
+    });
+    this.sessionQueue = operation;
+    return operation;
   }
 
   private sessionFor(tab: Tab): TabSession {
@@ -1047,6 +1392,7 @@ class App {
       encoding: tab.buffer.encoding,
       lineEnding: tab.buffer.lineEnding,
       bom: tab.buffer.bom,
+      baseVersion: tab.buffer.version,
       createdAtMs: tab.buffer.createdAtMs,
       languageOverride: tab.languageOverride,
     };
@@ -1104,7 +1450,12 @@ class App {
           lineEnding: doc.lineEnding,
           readOnly: doc.readOnly,
           mtimeMs: doc.mtimeMs,
+          version: doc.version,
+          externalVersion: null,
           savedContent: doc.content,
+          savedEncoding: doc.encoding,
+          savedBom: doc.bom,
+          savedLineEnding: doc.lineEnding,
           createdAtMs: Date.now(),
         };
       }
@@ -1118,6 +1469,16 @@ class App {
       if (entry.encoding) buffer.encoding = entry.encoding;
       if (entry.lineEnding) buffer.lineEnding = entry.lineEnding;
       buffer.bom = entry.bom;
+      if (entry.baseVersion) {
+        buffer.externalVersion = buffer.version
+          ? sameVersion(buffer.version, entry.baseVersion)
+            ? null
+            : buffer.version
+          : "missing";
+        buffer.version = entry.baseVersion;
+      } else if (entry.path && !buffer.version) {
+        buffer.externalVersion = "missing";
+      }
     }
     // Die Entstehungszeit kommt aus der Sitzung: Ein gestern begonnener,
     // noch namenloser Puffer bekäme sonst heute ein neues Datum als Namen.
@@ -1140,7 +1501,7 @@ class App {
       languageOverride: override?.id ?? null,
       state,
       scrollTop: entry.scrollTop,
-      modified: content !== buffer.savedContent,
+      modified: this.isModifiedBuffer(buffer, content),
     };
   }
 
@@ -1270,7 +1631,10 @@ class App {
         state: () => (enc === this.buffer.encoding ? "aktiv" : ""),
         run: () => {
           this.buffer.encoding = enc;
+          if (!supportsBom(enc)) this.buffer.bom = false;
           this.refreshStatus();
+          this.scheduleSessionSave();
+          this.scheduleAutosave();
         },
       })),
       {
@@ -1279,8 +1643,11 @@ class App {
         title: "Byte Order Mark schreiben",
         state: () => (this.buffer.bom ? "an" : "aus"),
         run: () => {
+          if (!supportsBom(this.buffer.encoding)) return;
           this.buffer.bom = !this.buffer.bom;
           this.refreshStatus();
+          this.scheduleSessionSave();
+          this.scheduleAutosave();
         },
       },
     ]);
@@ -1301,6 +1668,8 @@ class App {
         run: () => {
           this.buffer.lineEnding = value;
           this.refreshStatus();
+          this.scheduleSessionSave();
+          this.scheduleAutosave();
         },
       })),
     );
@@ -1332,8 +1701,10 @@ class App {
     }
     // `:q!` fragt nicht nach. Die Sitzung wird trotzdem geschrieben: sie
     // ist Ruis Sicherheitsnetz, nicht die Datei, die man verwerfen wollte.
-    await this.saveSession();
     this.closing = true;
+    window.clearTimeout(this.sessionTimer);
+    await this.flushAutosave();
+    await this.saveSession();
     await win.destroy();
   }
 
@@ -1519,7 +1890,10 @@ class App {
         group: "Datei",
         title: "Speichern unter…",
         shortcut: "Strg+Umschalt+S",
-        run: () => this.saveAs(),
+        run: () => {
+          const tab = this.tab;
+          return this.enqueueSave(() => this.saveAs(tab));
+        },
       },
       {
         id: "file.rename",
@@ -1772,7 +2146,10 @@ class App {
 
         if (e.shiftKey && key === "p") return run(() => this.palette.open());
         if (e.shiftKey && key === "o") return run(() => this.openFileDialog());
-        if (e.shiftKey && key === "s") return run(() => this.saveAs());
+        if (e.shiftKey && key === "s") {
+          const tab = this.tab;
+          return run(() => this.enqueueSave(() => this.saveAs(tab)));
+        }
         if (e.shiftKey && key === "a") return run(() => this.copyAll());
         if (e.shiftKey && key === "c") return run(() => this.copyToClipboard());
         if (e.shiftKey && key === "v") return run(() => this.pasteFromClipboard());
@@ -1830,16 +2207,29 @@ class App {
     const win = getCurrentWindow();
 
     void win.onCloseRequested(async (event) => {
-      if (this.closing) return;
       event.preventDefault();
-
-      await this.saveSession();
-      // Bei aktiver Sitzungswiederherstellung sind die Puffer gesichert,
-      // eine Rückfrage wäre dann nur im Weg.
-      if (!this.settings.restoreSession && !(await this.confirmUnsaved())) return;
-
+      if (this.closing) return;
       this.closing = true;
-      await win.destroy();
+
+      try {
+        window.clearTimeout(this.sessionTimer);
+        await this.flushAutosave();
+        const sessionSaved = await this.saveSession();
+        // Bei aktiver Sitzungswiederherstellung sind die Puffer gesichert,
+        // eine Rückfrage wäre dann nur im Weg.
+        const mustConfirm = !this.settings.restoreSession || !sessionSaved;
+        if (mustConfirm && !(await this.confirmUnsaved(!sessionSaved))) {
+          this.closing = false;
+          this.scheduleSessionSave();
+          return;
+        }
+
+        await win.destroy();
+      } catch (err) {
+        this.closing = false;
+        this.scheduleSessionSave();
+        await alertDialog(String(err), { title: "Schliessen fehlgeschlagen" });
+      }
     });
 
     // Externe Änderungen prüfen, sobald das Fenster wieder aktiv wird.
@@ -1864,8 +2254,6 @@ class App {
       if (event.payload.type !== "drop") return;
       void this.openAll(event.payload.paths);
     });
-
-    window.addEventListener("beforeunload", () => void this.saveSession());
   }
 }
 
@@ -1892,6 +2280,20 @@ function samePath(a: string | null, b: string): boolean {
 /** Nur der Dateiname, für Rückfragen, in denen der ganze Pfad stört. */
 function shortName(path: string): string {
   return path.split(/[\/]/).pop() ?? path;
+}
+
+function sameVersion(a: FileVersion, b: FileVersion): boolean {
+  return (
+    a.modifiedSecs === b.modifiedSecs &&
+    a.modifiedNanos === b.modifiedNanos &&
+    a.len === b.len &&
+    a.metadata === b.metadata &&
+    a.fingerprint === b.fingerprint
+  );
+}
+
+function supportsBom(encoding: string): boolean {
+  return encoding === "UTF-8" || encoding === "UTF-16LE" || encoding === "UTF-16BE";
 }
 
 /**

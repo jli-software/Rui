@@ -23,6 +23,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 
 # Encoding-Erkennung: chardetng rät, encoding_rs dekodiert/kodiert.
 # Beide von Mozilla, gehören zusammen.
@@ -38,16 +39,17 @@ notify = "6"
 # 23:30 entsteht, soll nicht auf den nächsten Tag datiert sein.
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 tauri-plugin-clipboard-manager = "2.3.2"
+tempfile = "3"
 
 [dev-dependencies]
-tempfile = "3"
+filetime = "0.2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 
 [target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_Storage_FileSystem"] }
 winreg = "0.56.0"
 
 [profile.release]

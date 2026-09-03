@@ -44,6 +44,25 @@ export interface LoadedDocument {
   lineEnding: LineEnding;
   readOnly: boolean;
   mtimeMs: number;
+  version: FileVersion;
+}
+
+export interface FileVersion {
+  modifiedSecs: number;
+  modifiedNanos: number;
+  len: number;
+  metadata: number;
+  fingerprint: string;
+}
+
+export type SavePrecondition =
+  | { kind: "unchanged"; version: FileVersion }
+  | { kind: "missing" }
+  | { kind: "any" };
+
+export interface SaveOutcome {
+  mtimeMs: number;
+  version: FileVersion;
 }
 
 /** Spiegelt `quick_open::QuickOpenFile` auf der Rust-Seite. */
@@ -51,6 +70,7 @@ export interface LoadedDocument {
 export interface RenameResult {
   path: string;
   mtimeMs: number;
+  version: FileVersion;
 }
 
 export interface QuickOpenFile {
@@ -112,6 +132,7 @@ export interface TabSession {
   encoding: string | null;
   lineEnding: LineEnding | null;
   bom: boolean;
+  baseVersion: FileVersion | null;
   createdAtMs: number | null;
   languageOverride: string | null;
 }
@@ -137,8 +158,15 @@ export interface Buffer {
   lineEnding: LineEnding;
   readOnly: boolean;
   mtimeMs: number;
+  /** Revision beim letzten Laden/Speichern; null bei einer neuen Datei. */
+  version: FileVersion | null;
+  /** Beobachtete fremde Revision, die der Nutzer bewusst behalten hat. */
+  externalVersion: FileVersion | "missing" | null;
   /** Inhalt beim letzten Laden/Speichern, für den Modified-Vergleich. */
   savedContent: string;
+  savedEncoding: string;
+  savedBom: boolean;
+  savedLineEnding: LineEnding;
   /**
    * Wann dieser Puffer entstanden ist (Epoche in ms). Ein namenloser
    * Puffer wird hieraus benannt und nicht aus der aktuellen Zeit — sonst

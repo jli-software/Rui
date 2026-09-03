@@ -88,6 +88,9 @@ jobs:
       - name: Versionen prüfen
         run: npm run check:version
 
+      - name: Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
       - name: Bauen
         shell: pwsh
         run: ./scripts/build-release.ps1

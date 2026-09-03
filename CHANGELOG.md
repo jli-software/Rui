@@ -6,6 +6,26 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
+### Behoben
+- **Speichern schützt jetzt konsequent vor Datenverlust.** Datei-Saves sind
+  an ihren Ursprungstab gebunden und laufen geordnet; eine verspätete Antwort
+  kann deshalb weder den falschen Tab markieren noch einen neueren Save
+  überholen. Externe Änderungen werden mit Zeit, Metadaten und SHA-256 direkt
+  vor dem Ersetzen geprüft. Erst eine ausdrückliche Bestätigung darf
+  eine fremde Fassung überschreiben; Autosave tut das nie.
+- **Atomare Writes funktionieren plattformgerecht.** Windows ersetzt
+  vorhandene Dateien über `ReplaceFileW`, Linux behält Unix-Rechte und den
+  letzten Symlink bei. Eindeutige Temp-Dateien verhindern Kollisionen, und
+  neue Ziele werden auch bei einem Rennen nicht wortlos überschrieben.
+- **Sitzungswiederherstellung bleibt ein verlässliches Sicherheitsnetz.**
+  Session-Dateien werden atomar und serialisiert geschrieben. Scheitert der
+  finale Snapshot, schliesst Rui geänderte Puffer nicht mehr ohne Rückfrage.
+  Die gespeicherte Basisrevision erkennt zudem externe Änderungen, die bei
+  geschlossenem Rui passiert sind.
+- Änderungen an Encoding, BOM oder Zeilenenden zählen nun als ungespeichert,
+  überleben die Sitzung und werden von Autosave berücksichtigt. Unzulässige
+  BOM-/Encoding-Kombinationen werden nicht mehr als erfolgreich ausgegeben.
+
 ### Geändert
 - **Das README beschreibt Ruis tatsächliche Produktidee.** Rui ist bewusst ein
   kleiner, fokussierter Editor für Windows und Linux statt der Behauptung, es
@@ -25,6 +45,9 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
   wenn NSIS- oder MSI-Installer fehlen, statt ein unvollständiges Artefaktset
   hochzuladen. Die Artefakt-Actions laufen auf den aktuellen, Node-24-fähigen
   Hauptversionen.
+- Der Release-Trockenlauf führt die Rust-Tests nun auch auf Windows aus; damit
+  wird das Ersetzen einer bereits vorhandenen Datei auf dem echten Zielsystem
+  geprüft.
 
 ### Geplant
 - Kürzel nicht nur zeigen, sondern umstellen können
