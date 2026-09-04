@@ -1,0 +1,15 @@
+2026-09-04 08:12:03 [INFO ] build 412 started on runner ubuntu-22.04
+2026-09-04 08:12:04 [INFO ] resolving 148 dependencies from lockfile
+2026-09-04 08:12:19 [INFO ] cache hit for node_modules (312 MB, 3.1 s)
+2026-09-04 08:12:41 [INFO ] frontend bundle written: 1.42 MB (gzip 386 kB)
+2026-09-04 08:13:57 [WARN ] chunk "highlight-powershell" exceeds 240 kB
+2026-09-04 08:14:02 [INFO ] rust workspace compiled in 81.4 s
+2026-09-04 08:14:03 [INFO ] running 34 tests
+2026-09-04 08:14:06 [INFO ] test result: ok. 34 passed; 0 failed; 0 ignored
+2026-09-04 08:14:11 [INFO ] packaging linux target x86_64-unknown-linux-gnu
+2026-09-04 08:14:48 [INFO ] artifact rui-linux-x86_64.tar.gz (7.4 MB)
+2026-09-04 08:15:02 [ERROR] windows job: signing skipped, no certificate configured
+2026-09-04 08:15:02 [INFO ] artifact rui-setup.exe (6.9 MB)
+2026-09-04 08:15:03 [INFO ] artifact rui-setup.msi (7.1 MB)
+2026-09-04 08:15:20 [INFO ] checksums written to SHA256SUMS.txt
+2026-09-04 08:15:21 [INFO ] build 412 finished, status success, 3 m 18 s

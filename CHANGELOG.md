@@ -18,6 +18,21 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
   vor dem Release entschieden sein, das davon profitieren soll
 
+### Geändert
+- **Die README-Bilder zeigen jetzt neutrale Beispieldateien** statt Scripts
+  mit Rollennamen und Druckerbezeichnungen aus dem Arbeitsalltag. Alle sechs
+  Aufnahmen sind mit denselben Dateien neu entstanden; die Dateien selbst
+  liegen unter `assets/screenshots/sample/`, damit die nächste Aufnahme
+  dieselben Zeilennummern trifft.
+
+### Hinzugefügt
+- **Ein GIF im Omarchy-Abschnitt** zeigt, was der Text bisher nur behauptet
+  hat: derselbe geöffnete Puffer durch Tokyo Night, Gruvbox, Everforest,
+  Kanagawa, Catppuccin Latte und Nord, ohne Neustart dazwischen. Wie die
+  Bilder entstehen — eigenes `HOME`, eigener Session-Bus, Fenstergrösse,
+  Omarchys Fenstertransparenz — steht jetzt vollständig in
+  `assets/screenshots/README.md`.
+
 ## [0.5.4] — 2026-09-04
 
 ### Behoben

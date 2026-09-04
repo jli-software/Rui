@@ -1,6 +1,8 @@
 # Logs
 logs
 *.log
+# ... ausser der Beispieldatei, die auf einem README-Screenshot offen ist
+!assets/screenshots/sample/deploy.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

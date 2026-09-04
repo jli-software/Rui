@@ -1,0 +1,30 @@
+# Editor configuration. Every value here has a default in settings.rs,
+# so a missing key is not an error.
+
+[editor]
+font_family = "Cascadia Code"
+font_size = 15
+line_height = 1.6
+tab_size = 4
+insert_spaces = true
+word_wrap = false
+
+[appearance]
+theme = "system"          # system | sage-light | sage-dark
+line_numbers = true
+relative_line_numbers = false
+highlight_active_line = true
+show_whitespace = false
+
+[files]
+autosave = false          # opening a file to read it must not change it
+trim_trailing_whitespace = false
+ensure_final_newline = false
+default_encoding = "UTF-8"
+default_line_ending = "lf"
+watch_external_changes = true
+
+[quick_open]
+search_open_file_folder = true
+search_folders = ["~/notes", "~/projects"]
+max_results = 200

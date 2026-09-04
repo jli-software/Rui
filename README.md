@@ -90,9 +90,13 @@ setup works on Windows and Linux.
 
 ## At home on Omarchy
 
-Outside Omarchy, Rui's Sage palette follows the system in light and dark mode.
 On [Omarchy](https://omarchy.org), Rui derives its colours from the active
-theme and follows theme changes while it is running.
+theme and follows a theme change while it is running — no restart, no
+second configuration to keep in sync.
+
+![Rui following the active Omarchy theme through Tokyo Night, Gruvbox, Everforest, Kanagawa, Catppuccin Latte and Nord](assets/screenshots/omarchy-themes.gif)
+
+Outside Omarchy, Rui's Sage palette follows the system in light and dark mode.
 
 ![The same editor in the light palette](assets/screenshots/light.png)
 
