@@ -6,6 +6,20 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
+### Geplant
+- Kürzel nicht nur zeigen, sondern umstellen können
+- Tabs umsortieren, Kontextmenü („Andere schliessen", „Rechts schliessen")
+- Weitere `:set`-Optionen — `:set list`, `:set tabstop`, `:set expandtab`
+
+### Geplant, ohne Termin
+- Theming, also frei wählbare Farben
+- Lokalisierung der Oberfläche (zuerst Englisch)
+- Code-Signing für Windows, Notarisierung für macOS
+- Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
+  vor dem Release entschieden sein, das davon profitieren soll
+
+## [0.5.4] — 2026-09-04
+
 ### Behoben
 - **Speichern schützt jetzt konsequent vor Datenverlust.** Datei-Saves sind
   an ihren Ursprungstab gebunden und laufen geordnet; eine verspätete Antwort
@@ -48,18 +62,6 @@ Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
 - Der Release-Trockenlauf führt die Rust-Tests nun auch auf Windows aus; damit
   wird das Ersetzen einer bereits vorhandenen Datei auf dem echten Zielsystem
   geprüft.
-
-### Geplant
-- Kürzel nicht nur zeigen, sondern umstellen können
-- Tabs umsortieren, Kontextmenü („Andere schliessen", „Rechts schliessen")
-- Weitere `:set`-Optionen — `:set list`, `:set tabstop`, `:set expandtab`
-
-### Geplant, ohne Termin
-- Theming, also frei wählbare Farben
-- Lokalisierung der Oberfläche (zuerst Englisch)
-- Code-Signing für Windows, Notarisierung für macOS
-- Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
-  vor dem Release entschieden sein, das davon profitieren soll
 
 ## [0.5.3] — 2026-08-30
 
@@ -944,7 +946,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.5.3...HEAD
+[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/jli-software/Rui/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/jli-software/Rui/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jli-software/Rui/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/jli-software/Rui/compare/v0.5.0...v0.5.1
