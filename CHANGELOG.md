@@ -17,11 +17,19 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Automatic updates — the updater plugin and keys must be bundled, so this
   has to be decided before the first release that should support it
 
+## [0.6.0] — 2026-09-04
+
 ### Changed
 - **English is now the default interface language for new installations.**
   German remains available under Settings → General → Interface language and
   the change takes effect immediately. Existing installations retain German
   until the user changes it.
+- **Rui has a new application icon:** a document with a terminal prompt and
+  pencil in the existing Sage palette. Separate SVG variants keep it legible
+  at 16–32 px, and the Windows executable embeds six size-specific layers.
+- Icon generation now runs through `npm run build:icons` on Linux and Windows
+  without requiring ImageMagick. It produces the Tauri PNGs, Windows tiles,
+  multi-resolution ICO and macOS ICNS from the checked-in SVG sources.
 - Linux and Windows package metadata, file associations and the Linux
   installer now use English product copy.
 - **The README screenshots now use neutral sample files** instead of scripts
@@ -962,7 +970,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.5.4...HEAD
+[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/jli-software/Rui/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/jli-software/Rui/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/jli-software/Rui/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/jli-software/Rui/compare/v0.5.1...v0.5.2
