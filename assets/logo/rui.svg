@@ -1,20 +1,51 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Rui — Salbeiblatt. Mittelrippe steht wie ein Schreibcursor,
-       die Seitenadern liegen da wie kurze Textzeilen.
-       Farben aus src/theme.ts (sageDark). -->
+  <!-- Rui — a document, terminal prompt and pencil. The deliberately
+       asymmetric silhouette remains unambiguous at application-icon sizes. -->
   <defs>
-    <linearGradient id="ruiBg" x1="0" y1="0" x2="0.35" y2="1">
+    <linearGradient id="ruiBg" x1="0.1" y1="0" x2="0.85" y2="1">
       <stop offset="0" stop-color="#333f34"/>
       <stop offset="1" stop-color="#1a201b"/>
     </linearGradient>
+    <linearGradient id="ruiPage" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a9c99f"/>
+      <stop offset="1" stop-color="#94b489"/>
+    </linearGradient>
   </defs>
+
   <rect width="512" height="512" rx="115" fill="url(#ruiBg)"/>
-  <path d="M 256 104 C 348 182, 380 268, 256 408 C 132 268, 164 182, 256 104 Z" fill="#94b489"/>
-  <path d="M 256 132 L 256 392" stroke="#1e2620" stroke-width="20" stroke-linecap="round"/>
-  <g stroke="#1e2620" stroke-width="15" stroke-linecap="round" opacity="0.85">
-    <path d="M 256 208 L 316 178"/>
-    <path d="M 256 208 L 196 178"/>
-    <path d="M 256 278 L 326 244"/>
-    <path d="M 256 278 L 186 244"/>
-  </g>
+
+  <!-- Document and folded corner. -->
+  <path d="M 111 91
+           Q 111 73 129 73
+           H 319
+           L 390 144
+           V 394
+           Q 390 420 364 420
+           H 137
+           Q 111 420 111 394 Z"
+        fill="url(#ruiPage)"/>
+  <path d="M 319 73 V 123 Q 319 144 340 144 H 390 Z"
+        fill="#d4e7c9"/>
+  <path d="M 319 73 V 123 Q 319 144 340 144 H 390"
+        fill="none" stroke="#273129" stroke-width="10" stroke-linejoin="round"/>
+
+  <!-- A compact terminal cue: Rui is code-friendly, but still an editor. -->
+  <path d="M 165 207 L 217 252 L 165 297"
+        fill="none" stroke="#1e2620" stroke-width="26"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 231 297 H 299"
+        fill="none" stroke="#1e2620" stroke-width="26" stroke-linecap="round"/>
+
+  <!-- Pencil, kept broad and geometric so the mark survives downscaling. -->
+  <path d="M 286 391 L 406 171
+           Q 416 152 435 162
+           L 454 172
+           Q 473 183 462 202
+           L 342 422 Z"
+        fill="#bdd6b2" stroke="#1e2620" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M 286 391 L 342 422 L 276 455 Z"
+        fill="#d4e7c9" stroke="#1e2620" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M 276 455 L 287 428 L 304 438 Z" fill="#1e2620"/>
+  <path d="M 402 178 L 458 209"
+        fill="none" stroke="#1e2620" stroke-width="24"/>
 </svg>

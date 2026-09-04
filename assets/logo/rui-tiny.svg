@@ -1,12 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Fassung für 16 px: nur noch die Silhouette. Auf dieser Grösse
-       teilt die Mittelrippe das Blatt optisch in zwei Streifen. -->
+  <!-- Rui at 16 px: flat fills and only the essential silhouettes. -->
   <defs>
-    <linearGradient id="ruiBgT" x1="0" y1="0" x2="0.35" y2="1">
+    <linearGradient id="ruiBgT" x1="0.1" y1="0" x2="0.85" y2="1">
       <stop offset="0" stop-color="#333f34"/>
       <stop offset="1" stop-color="#1a201b"/>
     </linearGradient>
   </defs>
+
   <rect width="512" height="512" rx="115" fill="url(#ruiBgT)"/>
-  <path d="M 256 74 C 372 168, 408 268, 256 438 C 104 268, 140 168, 256 74 Z" fill="#94b489"/>
+  <path d="M 100 76 H 315 L 401 162 V 404 Q 401 430 375 430 H 126 Q 100 430 100 404 Z"
+        fill="#9fbe95"/>
+  <path d="M 315 76 V 132 Q 315 162 345 162 H 401 Z" fill="#d4e7c9"/>
+  <path d="M 151 206 L 215 257 L 151 308"
+        fill="none" stroke="#1e2620" stroke-width="36"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 235 308 H 302"
+        fill="none" stroke="#1e2620" stroke-width="36" stroke-linecap="round"/>
+  <path d="M 279 388 L 413 153 L 470 186 L 336 422 Z"
+        fill="#c7dcbc" stroke="#1e2620" stroke-width="22" stroke-linejoin="round"/>
+  <path d="M 279 388 L 336 422 L 268 461 Z"
+        fill="#d4e7c9" stroke="#1e2620" stroke-width="22" stroke-linejoin="round"/>
+  <path d="M 268 461 L 282 428 L 303 440 Z" fill="#1e2620"/>
 </svg>

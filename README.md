@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo/rui.svg" width="96" height="96" alt="">
+<img src="assets/logo/rui.svg" width="96" height="96" alt="Rui logo">
 
 # Rui
 
