@@ -20,6 +20,9 @@ Rui is deliberately another text editor. It does not try to replace an IDE or
 win a feature checklist. Its job is smaller: open plain-text files quickly,
 edit them reliably, and feel the same on Windows and Linux.
 
+The interface is **English by default**. German is available under
+**Settings → General → Interface language** and switches immediately.
+
 I built Rui because I wanted one focused editor on both platforms. Windows
 Notepad is too limited for the way I work, while a full IDE is often more than
 I need. I also wanted a practical way to use and learn Vim-style editing

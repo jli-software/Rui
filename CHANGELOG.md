@@ -1,37 +1,38 @@
 # Changelog
 
-Alle nennenswerten Änderungen an Rui stehen hier drin.
-Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
-Versionierung nach [Semantic Versioning](https://semver.org/lang/de/).
+All notable changes to Rui are documented here.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unveröffentlicht]
+## [Unreleased]
 
-### Geplant
-- Kürzel nicht nur zeigen, sondern umstellen können
-- Tabs umsortieren, Kontextmenü („Andere schliessen", „Rechts schliessen")
-- Weitere `:set`-Optionen — `:set list`, `:set tabstop`, `:set expandtab`
+### Planned
+- Make keyboard shortcuts configurable, not just discoverable
+- Reorder tabs and add context actions such as “Close Others” and “Close to the Right”
+- More `:set` options — `:set list`, `:set tabstop`, `:set expandtab`
 
-### Geplant, ohne Termin
-- Theming, also frei wählbare Farben
-- Lokalisierung der Oberfläche (zuerst Englisch)
-- Code-Signing für Windows, Notarisierung für macOS
-- Auto-Update — Updater-Plugin und Schlüssel müssen ins Bundle, muss also
-  vor dem Release entschieden sein, das davon profitieren soll
+### Planned, not scheduled
+- Custom colour themes
+- Code signing for Windows and notarisation for macOS
+- Automatic updates — the updater plugin and keys must be bundled, so this
+  has to be decided before the first release that should support it
 
-### Geändert
-- **Die README-Bilder zeigen jetzt neutrale Beispieldateien** statt Scripts
-  mit Rollennamen und Druckerbezeichnungen aus dem Arbeitsalltag. Alle sechs
-  Aufnahmen sind mit denselben Dateien neu entstanden; die Dateien selbst
-  liegen unter `assets/screenshots/sample/`, damit die nächste Aufnahme
-  dieselben Zeilennummern trifft.
+### Changed
+- **English is now the default interface language for new installations.**
+  German remains available under Settings → General → Interface language and
+  the change takes effect immediately. Existing installations retain German
+  until the user changes it.
+- Linux and Windows package metadata, file associations and the Linux
+  installer now use English product copy.
+- **The README screenshots now use neutral sample files** instead of scripts
+  containing workplace role names and printer models. The reusable source
+  files live under `assets/screenshots/sample/` so future captures retain the
+  same line numbers.
 
-### Hinzugefügt
-- **Ein GIF im Omarchy-Abschnitt** zeigt, was der Text bisher nur behauptet
-  hat: derselbe geöffnete Puffer durch Tokyo Night, Gruvbox, Everforest,
-  Kanagawa, Catppuccin Latte und Nord, ohne Neustart dazwischen. Wie die
-  Bilder entstehen — eigenes `HOME`, eigener Session-Bus, Fenstergrösse,
-  Omarchys Fenstertransparenz — steht jetzt vollständig in
-  `assets/screenshots/README.md`.
+### Added
+- **An animated Omarchy example** shows the same open buffer switching through
+  Tokyo Night, Gruvbox, Everforest, Kanagawa, Catppuccin Latte and Nord without
+  restarting Rui. Reproduction details are in `assets/screenshots/README.md`.
 
 ## [0.5.4] — 2026-09-04
 

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { tr } from "./i18n";
 import type { Settings } from "./types";
 
 type FieldDef =
@@ -49,6 +50,20 @@ interface PathStatus {
  * das Feld im Rust-`Settings`-Struct und einen Eintrag hier.
  */
 const SECTIONS: Section[] = [
+  {
+    title: "Allgemein",
+    fields: [
+      {
+        key: "uiLanguage",
+        type: "select",
+        label: "Oberflächensprache",
+        options: [
+          ["en", "English"],
+          ["de", "Deutsch"],
+        ],
+      },
+    ],
+  },
   {
     title: "Darstellung",
     fields: [
@@ -432,7 +447,7 @@ export class SettingsDialog {
       label.textContent = "Im Terminal verfügbar";
       const hint = document.createElement("small");
 
-      const beispiel = windows ? "rui datei.ps1" : "rui datei.sh";
+      const beispiel = tr(windows ? "rui datei.ps1" : "rui datei.sh");
       const wo = windows ? "den Benutzer-PATH" : "~/.local/bin";
 
       if (status.registered) {

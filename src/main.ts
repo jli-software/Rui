@@ -19,6 +19,7 @@ import { StatusBar } from "./statusbar";
 import { TabBar, tabTitle, type Tab } from "./tabs";
 import { TitleBar } from "./titlebar";
 import { omarchyPalette, sageDark, sageLight } from "./theme";
+import { setUiLanguage, tr } from "./i18n";
 import type { VimOption } from "./vim";
 import {
   LANGUAGES,
@@ -108,6 +109,7 @@ class App {
 
   async start() {
     this.settings = await invoke<Settings>("load_settings");
+    setUiLanguage(this.settings.uiLanguage);
 
     const host = document.querySelector<HTMLElement>("#editor")!;
     this.editor = new RuiEditor(
@@ -537,8 +539,8 @@ class App {
   }
 
   private get fileName() {
-    if (!this.buffer.path) return "Unbenannt";
-    return this.buffer.path.split(/[\\/]/).pop() ?? "Unbenannt";
+    if (!this.buffer.path) return tr("Unbenannt");
+    return this.buffer.path.split(/[\\/]/).pop() ?? tr("Unbenannt");
   }
 
   private onChanged() {
@@ -1132,11 +1134,15 @@ class App {
           : false;
       }
       // Encoding kann den Text nicht darstellen: UTF-8 anbieten.
-      if (text.includes("nicht darstellen kann")) {
-        const useUtf8 = await confirmDialog(text, {
-          title: "Encoding",
-          okLabel: "Als UTF-8 speichern",
-        });
+      if (text.startsWith("ENCODING_UNREPRESENTABLE:")) {
+        const encoding = text.slice("ENCODING_UNREPRESENTABLE:".length);
+        const useUtf8 = await confirmDialog(
+          tr(`Der Text enthält Zeichen, die ${encoding} nicht darstellen kann. Als UTF-8 speichern?`),
+          {
+            title: "Encoding",
+            okLabel: "Als UTF-8 speichern",
+          },
+        );
         if (useUtf8) {
           tab.buffer.encoding = "UTF-8";
           return this.writeTo(tab, path, precondition, sameAsBuffer);
@@ -1510,6 +1516,7 @@ class App {
   private async updateSettings(next: Settings) {
     const prev = this.settings;
     this.settings = next;
+    if (prev.uiLanguage !== next.uiLanguage) setUiLanguage(next.uiLanguage);
     this.editor.applySettings(next);
 
     if (prev.syntaxHighlighting !== next.syntaxHighlighting) {
@@ -1539,9 +1546,12 @@ class App {
       danger: true,
     });
     if (!sure) return;
-    // Eine leere Datei bedeutet: überall greifen die Defaults aus dem Code.
-    await invoke("save_settings", { settings: {} });
+    // Die explizite Sprache unterscheidet einen Reset von einer alten
+    // Einstellungsdatei ohne Sprachfeld, die aus Kompatibilitätsgründen
+    // weiterhin auf Deutsch startet.
+    await invoke("save_settings", { settings: { uiLanguage: "en" } });
     this.settings = await invoke<Settings>("load_settings");
+    setUiLanguage(this.settings.uiLanguage);
     this.editor.applySettings(this.settings);
     await this.editor.applyLanguage(this.language);
     await this.editor.applyVimMode();

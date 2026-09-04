@@ -270,10 +270,7 @@ fn encode_with_endings(
     }
     let (encoded, _, had_errors) = enc.encode(&with_endings);
     if had_errors {
-        return Err(format!(
-            "Der Text enthält Zeichen, die {} nicht darstellen kann. Als UTF-8 speichern?",
-            enc.name()
-        ));
+        return Err(format!("ENCODING_UNREPRESENTABLE:{}", enc.name()));
     }
 
     let mut out: Vec<u8> = Vec::with_capacity(encoded.len() + 3);

@@ -32,6 +32,14 @@ pub enum NoteExtension {
     Txt,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UiLanguage {
+    #[default]
+    En,
+    De,
+}
+
 /// Vorgaben statt eines freien Musters: ein vertippter Formatstring würde
 /// still danebenliegende Dateinamen erzeugen, und ein Dateiname lässt sich
 /// nicht so leicht zurücknehmen wie eine Anzeige.
@@ -70,6 +78,9 @@ impl NoteDateFormat {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
+    // --- General ---
+    pub ui_language: UiLanguage,
+
     // --- Darstellung ---
     pub theme: Theme,
     pub font_family: String,
@@ -154,6 +165,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            ui_language: UiLanguage::En,
             theme: Theme::System,
             decoration_mode: DecorationMode::Auto,
             font_family: default_mono_stack(),
@@ -252,6 +264,23 @@ fn migrate_session(value: serde_json::Value) -> Session {
     }
 }
 
+fn migrate_settings(mut value: serde_json::Value) -> Settings {
+    let Some(object) = value.as_object_mut() else {
+        return Settings::default();
+    };
+    match object.get("uiLanguage").and_then(serde_json::Value::as_str) {
+        // Existing Rui installations were German before this setting existed.
+        None => {
+            object.insert("uiLanguage".into(), serde_json::Value::String("de".into()));
+        }
+        Some("en" | "de") => {}
+        Some(_) => {
+            object.insert("uiLanguage".into(), serde_json::Value::String("en".into()));
+        }
+    }
+    serde_json::from_value(value).unwrap_or_default()
+}
+
 fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
@@ -279,7 +308,14 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
 
 #[tauri::command]
 pub fn load_settings(app: AppHandle) -> Result<Settings, String> {
-    Ok(read_json(&config_dir(&app)?.join("settings.json")))
+    let path = config_dir(&app)?.join("settings.json");
+    let Ok(json) = fs::read_to_string(path) else {
+        return Ok(Settings::default());
+    };
+    let Ok(value) = serde_json::from_str(json.as_str()) else {
+        return Ok(Settings::default());
+    };
+    Ok(migrate_settings(value))
 }
 
 #[tauri::command]
@@ -323,6 +359,7 @@ mod tests {
 
         assert_eq!(name(&NoteExtension::Md), "md");
         assert_eq!(name(&Theme::SageLight), "sage-light");
+        assert_eq!(name(&UiLanguage::En), "en");
     }
 
     fn name<T: Serialize>(value: &T) -> String {
@@ -337,13 +374,40 @@ mod tests {
     #[test]
     fn alte_einstellungsdatei_bekommt_die_neuen_defaults() {
         let alt = r#"{ "theme": "sage-dark", "notesFolder": "/tmp/notizen" }"#;
-        let s: Settings = serde_json::from_str(alt).unwrap();
+        let s = migrate_settings(serde_json::from_str(alt).unwrap());
 
         assert_eq!(s.theme, Theme::SageDark);
+        assert_eq!(s.ui_language, UiLanguage::De);
         assert_eq!(s.notes_folder.as_deref(), Some("/tmp/notizen"));
         assert_eq!(s.note_date_format, NoteDateFormat::YmdHm);
         assert_eq!(s.autosave_delay_ms, 500);
         assert!(!s.vim_mode);
+    }
+
+    #[test]
+    fn neue_und_explizite_sprache_bleiben_erhalten() {
+        assert_eq!(Settings::default().ui_language, UiLanguage::En);
+
+        let reset: Settings = serde_json::from_value(serde_json::json!({
+            "uiLanguage": "en"
+        }))
+        .unwrap();
+        assert_eq!(reset.ui_language, UiLanguage::En);
+        assert_eq!(reset.theme, Theme::System);
+
+        let explicit = migrate_settings(serde_json::json!({
+            "uiLanguage": "de",
+            "theme": "sage-light"
+        }));
+        assert_eq!(explicit.ui_language, UiLanguage::De);
+        assert_eq!(explicit.theme, Theme::SageLight);
+
+        let unknown = migrate_settings(serde_json::json!({
+            "uiLanguage": "fr",
+            "theme": "sage-dark"
+        }));
+        assert_eq!(unknown.ui_language, UiLanguage::En);
+        assert_eq!(unknown.theme, Theme::SageDark);
     }
 
     /// Eine Sitzungsdatei aus 0.3.x hat ihren einen Puffer direkt in der

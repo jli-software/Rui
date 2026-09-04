@@ -437,7 +437,7 @@ mod imp {
             "[Desktop Entry]\n\
              Type=Application\n\
              Name=Rui\n\
-             Comment=Schlanker Texteditor\n\
+             Comment=Focused text editor\n\
              Exec={exec} %f\n\
              Icon=rui\n\
              Terminal=false\n\

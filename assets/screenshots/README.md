@@ -1,51 +1,46 @@
-# Screenshots fürs README
+# README screenshots
 
-Was hier liegt und wo es im README steht:
+Files in this directory and where they appear in the README:
 
-| Datei | Zeigt |
+| File | Shows |
 |---|---|
-| `editor.png` | Hauptbild: PowerShell-Script, drei Reiter, einer mit dem Punkt für „geändert" |
-| `quick-open.png` | Quick Open (`Strg+O`), nach `deploy` gefiltert |
-| `unsaved.png` | Der Dialog vor ungespeicherten Änderungen — helles Schema |
-| `shortcuts.png` | Die Kürzel-Übersicht (`Strg+K`) mit den Kategoriereitern |
-| `vim.png` | Visual-Line-Auswahl, Modus in der Statusleiste |
-| `light.png` | Dieselbe Oberfläche im hellen Schema, TOML |
-| `omarchy-themes.gif` | Themenwechsel zur Laufzeit: Tokyo Night, Gruvbox, Everforest, Kanagawa, Catppuccin Latte, Nord |
+| `editor.png` | Hero image: a PowerShell script, three tabs, one marked as modified |
+| `quick-open.png` | Quick Open (`Ctrl+O`) filtered by `deploy` |
+| `unsaved.png` | The unsaved-changes dialog in the light palette |
+| `shortcuts.png` | The shortcut reference (`Ctrl+K`) and its category tabs |
+| `vim.png` | Visual Line selection and the mode in the status bar |
+| `light.png` | The same interface in the light palette, showing TOML |
+| `omarchy-themes.gif` | Live theme switching through Tokyo Night, Gruvbox, Everforest, Kanagawa, Catppuccin Latte and Nord |
 
-Die Dateien, die auf den Bildern offen sind, liegen unter `sample/`. Sie sind
-generisch und ohne Bezug zu einem Arbeitgeber — wer die Bilder neu aufnimmt,
-nimmt dieselben und bekommt dieselben Zeilennummern.
+The files visible in the screenshots live under `sample/`. They are generic
+and contain no employer-specific data. Reusing them keeps line numbers stable
+between captures.
 
-## So sind sie entstanden
+## Capture setup
 
-- **Sage-Palette, nicht das Omarchy-Theme des eigenen Rechners** (gilt für die
-  sechs PNG): Rui mit einem eigenen `HOME` starten, in dem es kein
-  `~/.local/state/omarchy` gibt. Sonst zeigt das Bild die Farben eines Themes
-  und nicht die von Rui. Fürs GIF genau umgekehrt: in dieses `HOME` einen
-  Symlink auf das echte `~/.local/state/omarchy` legen.
-- Ein zweites Rui neben dem laufenden gibt es nur über eine eigene
-  Session-Bus-Instanz — `dbus-run-session -- rui …`, sonst reicht das
-  Single-Instance-Plugin die Dateien an die schon laufende Instanz weiter.
-- Fenster rund 1344 × 862 Punkte auf einem Bildschirm mit Skalierung 2, also
-  2688 × 1724 Pixel; fürs Repository auf 1600 px Breite herunterskaliert.
-  Unter Hyprland: Fenster floaten lassen, exakt auf diese Grösse setzen und
-  unter die Leiste schieben, sonst schneidet die Bar das Bild oben an.
-- **Omarchy blendet jedes Fenster leicht durch** (`opacity 0.985 0.96`), und
-  dann steht das Hintergrundbild im Editor. Für die Aufnahme
-  `o.window({ class = "rui" }, { opacity = "1 1" })` setzen und danach wieder
-  auf den Standardwert zurück.
-- Benachrichtigungen liegen über dem Fenster und landen mit im Bild.
-  `omarchy-notification-dismiss <text>` räumt eine weg.
-- Schriftgrösse 15, Zeilenhöhe 1.6 — bei den Vorgabewerten wird die Schrift
-  im README zu klein.
-- Dekoration auf `none`, damit kein Titelbalken das Bild oben abschneidet.
-- Inhalte ohne echte Namen, Pfade oder Hostnamen aus dem Bildungszentrum.
+- **Use the Sage palette, not the workstation's Omarchy theme** for the six
+  PNG files. Start Rui with a separate `HOME` that has no
+  `~/.local/state/omarchy`. Do the opposite for the GIF: link the real Omarchy
+  state directory into that isolated home.
+- Run the second Rui instance on a separate session bus with
+  `dbus-run-session -- rui …`; otherwise the single-instance plugin forwards
+  files to the already running instance.
+- Use a window around 1344 × 862 logical pixels on a scale-2 display, then
+  resize the capture to 1600 pixels wide. On Hyprland, float the window and
+  place it below the bar before capturing.
+- Omarchy applies slight window transparency (`opacity 0.985 0.96`). Override
+  it with `o.window({ class = "rui" }, { opacity = "1 1" })` for screenshots,
+  then restore the default.
+- Dismiss notifications before capturing because they appear above the app.
+- Use font size 15 and line height 1.6; the defaults are too small in the
+  rendered README.
+- Set decorations to `none` so no title bar is cropped into the image.
+- Keep all visible content free of real names, paths and host names.
 
-Fürs GIF pro Theme ein Einzelbild mit `grim` statt einer Bildschirmaufnahme:
-`omarchy-theme-set <Name>`, gut zwei Sekunden warten, aufnehmen. Das gibt
-scharfe Frames statt Videokompression. Danach mit `ffmpeg` und
-`palettegen=stats_mode=single` zusammensetzen — eine gemeinsame Palette über
-sechs Themen hinweg reicht für Text nicht.
+For the GIF, capture one sharp frame per theme with `grim` after running
+`omarchy-theme-set <Name>` and waiting about two seconds. Assemble the frames
+with `ffmpeg` and `palettegen=stats_mode=single`; one shared palette across all
+six themes does not preserve text well.
 
-Der Ordner liegt unter `assets/`, nicht unter `assets/logo/` — dort stehen
-die Quell-SVGs fürs Icon, die `scripts/build-icons.ps1` verarbeitet.
+This directory belongs under `assets/`, not `assets/logo/`, which contains the
+source SVG files processed by `scripts/build-icons.ps1`.

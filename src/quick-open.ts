@@ -1,4 +1,5 @@
 import { fuzzyScoreLower, matchRanges } from "./palette";
+import { tr, uiLanguage } from "./i18n";
 import type { QuickOpenFile } from "./types";
 
 /**
@@ -264,7 +265,7 @@ export class QuickOpen {
         ? ""
         : folders.length === 1
           ? shortenPath(folders[0])
-          : `${folders.length} Ordner`;
+          : tr(`${folders.length} Ordner`);
     this.scope.title = folders.join("\n");
   }
 
@@ -605,24 +606,32 @@ function itemFolder(file: QuickOpenFile): string {
  * Englisch, stand neben „Heute" ein „10:42 PM". Die Oberfläche ist
  * deutsch, also ist es auch die Uhrzeit.
  */
-const TIME_FORMAT = new Intl.DateTimeFormat("de-CH", { hour: "2-digit", minute: "2-digit" });
-const DATE_FORMAT = new Intl.DateTimeFormat("de-CH", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
+function timeFormat() {
+  return new Intl.DateTimeFormat(uiLanguage() === "de" ? "de-CH" : "en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function dateFormat() {
+  return new Intl.DateTimeFormat(uiLanguage() === "de" ? "de-CH" : "en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
 
 function formatModified(modifiedMs: number): string {
   const date = new Date(modifiedMs);
   const now = new Date();
   const sameDay = date.toDateString() === now.toDateString();
   if (sameDay) {
-    return `Heute ${TIME_FORMAT.format(date)}`;
+    return `${uiLanguage() === "de" ? "Heute" : "Today"} ${timeFormat().format(date)}`;
   }
 
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) {
-    return `Gestern ${TIME_FORMAT.format(date)}`;
+    return `${uiLanguage() === "de" ? "Gestern" : "Yesterday"} ${timeFormat().format(date)}`;
   }
-  return DATE_FORMAT.format(date);
+  return dateFormat().format(date);
 }

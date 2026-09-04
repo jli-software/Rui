@@ -3,6 +3,7 @@ export type Theme = "sage-light" | "sage-dark" | "system";
 export type NoteExtension = "md" | "txt";
 export type NoteDateFormat = "ymd" | "ymd-hm" | "ymd-compact" | "ymd-compact-hm" | "dmy";
 export type DecorationMode = "auto" | "native" | "custom" | "none";
+export type UiLanguage = "en" | "de";
 /** Nach `auto`-Auflösung — nie `auto` selbst. */
 export type ResolvedDecorationMode = "native" | "custom" | "none";
 
@@ -84,6 +85,7 @@ export interface QuickOpenFile {
 
 /** Spiegelt `settings::Settings` auf der Rust-Seite. */
 export interface Settings {
+  uiLanguage: UiLanguage;
   theme: Theme;
   decorationMode: DecorationMode;
   fontFamily: string;

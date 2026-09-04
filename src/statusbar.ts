@@ -1,5 +1,6 @@
 import type { Buffer } from "./types";
 import type { VimStatus } from "./vim";
+import { tr } from "./i18n";
 
 export interface StatusInfo {
   line: number;
@@ -168,13 +169,13 @@ export class StatusBar {
     // Dekoration sieht man den Titel gar nicht — und mit mehreren Rui-
     // Fenstern nebeneinander erst recht nicht das richtige.
     const path = buffer.path;
-    const name = path ? path.split(/[\\/]/).pop() || path : "Unbenannt";
+    const name = path ? path.split(/[\\/]/).pop() || path : tr("Unbenannt");
     this.file.textContent = (modified ? "• " : "") + name;
     this.file.classList.toggle("is-modified", modified);
     this.file.classList.toggle("is-unnamed", !path);
     this.file.title = path
-      ? `${path}\nKlick kopiert den Pfad`
-      : "Noch nicht gespeichert — Strg+S gibt der Notiz einen Namen";
+      ? `${path}\n${tr("Klick kopiert den Pfad")}`
+      : tr("Noch nicht gespeichert — Strg+S gibt der Notiz einen Namen");
 
     this.position.textContent = `Z ${info.line}, Sp ${info.column}`;
 

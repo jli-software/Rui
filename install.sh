@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-# Installiert Rui für den angemeldeten Benutzer — aus dem neuesten GitHub-Release
-# oder aus einem bereits entpackten Ordner.
+# Installs Rui for the current user from the latest GitHub release or from an
+# already extracted directory.
 #
 #   curl -fsSL https://raw.githubusercontent.com/jli-software/Rui/main/install.sh | bash
 #   curl -fsSL .../install.sh | bash -s -- --version v0.3.7
 #   curl -fsSL .../install.sh | bash -s -- --uninstall
 #
-# Dasselbe Script liegt im Release-Tarball. Findet es neben sich eine Binary,
-# installiert es die statt herunterzuladen — so gibt es für „installieren" genau
-# eine Wahrheit, egal ob der Weg über curl, über den Tarball oder über
-# scripts/install-linux.sh aus dem Quellbaum führt.
+# The same script is included in the release tarball. If it finds a binary next
+# to itself, it installs that binary instead of downloading another copy.
 #
 # Nichts davon braucht Root. Alles landet unter dem Benutzerprofil, an den
 # Orten, die die XDG-Spezifikation dafür vorsieht:
@@ -57,16 +55,16 @@ while [[ $# -gt 0 ]]; do
         --version)   version="${2:-}"; shift 2 ;;
         --from)      quelle="${2:-}"; shift 2 ;;
         -h|--help)
-            sed -n '2,10p' "$0" 2>/dev/null || echo "install.sh [--version vX.Y.Z] [--from ORDNER] [--uninstall]"
+            sed -n '2,10p' "$0" 2>/dev/null || echo "install.sh [--version vX.Y.Z] [--from DIRECTORY] [--uninstall]"
             exit 0 ;;
-        *) echo "Unbekannte Option: $1" >&2; exit 1 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
 
 # --------------------------------------------------------------- entfernen
 
 if [[ "$aktion" == "uninstall" ]]; then
-    echo "==> Rui entfernen"
+    echo "==> Uninstall Rui"
     rm -f "$bin_link" "$desktop_file"
     rm -rf "$app_dir"
     for size in 32x32 64x64 128x128 256x256 512x512; do
@@ -74,7 +72,7 @@ if [[ "$aktion" == "uninstall" ]]; then
     done
     command -v update-desktop-database >/dev/null && update-desktop-database "$desktop_dir" || true
     command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -qtf "$icon_root" || true
-    echo "==> Entfernt. Einstellungen und Notizen bleiben, die liegen woanders."
+    echo "==> Removed. Settings and notes are stored elsewhere and remain untouched."
     exit 0
 fi
 
@@ -85,7 +83,7 @@ fi
 # gelesen hat es kein Verzeichnis, deshalb die Prüfung auf eine echte Datei.
 if [[ -n "$quelle" ]]; then
     binary="$(finde_binary "$quelle")" || {
-        echo "In $quelle liegt keine gebaute Binary." >&2; exit 1; }
+        echo "No built binary found in $quelle." >&2; exit 1; }
 elif [[ -f "${BASH_SOURCE[0]:-}" ]]; then
     eigenes_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     if binary="$(finde_binary "$eigenes_dir")"; then quelle="$eigenes_dir"; fi
@@ -95,12 +93,12 @@ tmp=""
 if [[ -z "$quelle" ]]; then
     arch="$(uname -m)"
     if [[ "$arch" != "x86_64" ]]; then
-        echo "Fertige Builds gibt es nur für x86_64, hier läuft $arch." >&2
-        echo "Aus den Quellen bauen: https://github.com/$repo#build" >&2
+        echo "Prebuilt releases are only available for x86_64; this system is $arch." >&2
+        echo "Build from source: https://github.com/$repo#build" >&2
         exit 1
     fi
-    command -v curl >/dev/null || { echo "curl wird gebraucht." >&2; exit 1; }
-    command -v tar  >/dev/null || { echo "tar wird gebraucht." >&2; exit 1; }
+    command -v curl >/dev/null || { echo "curl is required." >&2; exit 1; }
+    command -v tar  >/dev/null || { echo "tar is required." >&2; exit 1; }
 
     if [[ -n "$version" ]]; then
         url="https://github.com/$repo/releases/download/$version/$asset"
@@ -112,17 +110,17 @@ if [[ -z "$quelle" ]]; then
 
     tmp="$(mktemp -d)"
     trap 'rm -rf "$tmp"' EXIT
-    echo "==> Lade $asset"
+    echo "==> Download $asset"
     curl -fSL --progress-bar "$url" -o "$tmp/$asset"
     tar -xzf "$tmp/$asset" -C "$tmp"
     quelle="$tmp/rui-linux-x86_64"
     binary="$(finde_binary "$quelle")" || {
-        echo "Im Archiv steckt keine Binary." >&2; exit 1; }
+        echo "The archive does not contain a binary." >&2; exit 1; }
 fi
 
 # ------------------------------------------------------------ installieren
 
-echo "==> Binary nach $app_dir"
+echo "==> Install binary to $app_dir"
 mkdir -p "$app_dir"
 # Erst daneben, dann umbenennen: Eine laufende Rui-Instanz hält ihre Binary
 # offen. Überschreiben schlägt fehl oder trifft den laufenden Prozess, ein
@@ -141,7 +139,7 @@ echo "==> Symlink $bin_link"
 mkdir -p "$(dirname "$bin_link")"
 ln -sfn "$app_dir/rui" "$bin_link"
 
-echo "==> Icons nach $icon_root"
+echo "==> Install icons to $icon_root"
 # Zwei Layouts: im Tarball heissen die Dateien nach ihrer Zielgrösse, im
 # Quellbaum nach Tauris Konvention (128x128@2x.png ist ein 256er, icon.png
 # ein 512er).
@@ -160,7 +158,7 @@ install_icon 128x128 128x128.png
 install_icon 256x256 128x128@2x.png
 install_icon 512x512 icon.png
 
-echo "==> Starter $desktop_file"
+echo "==> Install desktop entry to $desktop_file"
 mkdir -p "$desktop_dir"
 # Wortgleich mit dem, was `integration.rs::desktop_entry()` schreibt — sonst
 # meldet Rui in den Einstellungen "nicht eingehängt", obwohl die Datei da ist.
@@ -169,7 +167,7 @@ cat > "$desktop_file" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Rui
-Comment=Schlanker Texteditor
+Comment=Focused text editor
 Exec=$app_dir/rui %f
 Icon=rui
 Terminal=false
@@ -185,9 +183,9 @@ command -v update-desktop-database >/dev/null && update-desktop-database "$deskt
 command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -qtf "$icon_root" || true
 
 echo
-echo "==> Fertig."
-echo "    rui datei.txt        im Terminal"
-echo "    Rui                  im Anwendungsstarter (SUPER+Leertaste)"
+echo "==> Done."
+echo "    rui file.txt         in the terminal"
+echo "    Rui                  in the app launcher (SUPER+Space)"
 
 # Ein Symlink in einem Ordner, den die Shell nicht durchsucht, nützt
 # niemandem. Auf Arch, Fedora und Debian steht ~/.local/bin ausgeliefert
@@ -196,9 +194,9 @@ case ":$PATH:" in
     *":$HOME/.local/bin:"*) ;;
     *)
         echo
-        echo "    Achtung: $HOME/.local/bin steht nicht im PATH."
-        echo "    Für bash/zsh:  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
-        echo "    Für fish:      fish_add_path ~/.local/bin"
+        echo "    Warning: $HOME/.local/bin is not in PATH."
+        echo "    For bash/zsh:  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+        echo "    For fish:      fish_add_path ~/.local/bin"
         ;;
 esac
 
@@ -206,7 +204,7 @@ esac
 # jemand dazu macht — das ist eine Entscheidung, keine Nebenwirkung einer
 # Installation.
 echo
-echo "    Standard-Editor für .txt werden (optional):"
+echo "    Make Rui the default editor for .txt files (optional):"
 echo "    xdg-mime default rui.desktop text/plain"
 echo
-echo "    Wieder entfernen:  $app_dir/install.sh --uninstall"
+echo "    Uninstall:  $app_dir/install.sh --uninstall"

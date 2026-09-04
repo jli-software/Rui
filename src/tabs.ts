@@ -2,6 +2,7 @@ import type { EditorState } from "@codemirror/state";
 
 import type { LanguageDef } from "./languages";
 import type { Buffer } from "./types";
+import { tr } from "./i18n";
 
 /**
  * Ein Tab: der Puffer und alles, was der Editor beim Zurückwechseln
@@ -45,7 +46,7 @@ export interface TabBarActions {
 /** Der Name im Reiter — der Dateiname, sonst „Unbenannt". */
 export function tabTitle(tab: Tab): string {
   const path = tab.buffer.path;
-  if (!path) return "Unbenannt";
+  if (!path) return tr("Unbenannt");
   return path.split(/[\\/]/).pop() || path;
 }
 
@@ -235,7 +236,9 @@ export class TabBar {
       element.className = "tab";
       element.dataset.id = String(tab.id);
       element.setAttribute("role", "tab");
-      element.title = `${tab.buffer.path ?? "Ungespeichert"}\nDoppelklick benennt um`;
+      element.title = tab.buffer.path
+        ? `${tab.buffer.path}\n${tr("Doppelklick benennt um")}`
+        : `${tr("Ungespeichert")}\n${tr("Doppelklick benennt um")}`;
       if (tab.id === activeId) element.classList.add("is-active");
       if (tab.modified) element.classList.add("is-modified");
 
@@ -259,8 +262,8 @@ export class TabBar {
 
       const close = document.createElement("button");
       close.className = "tab-close";
-      close.setAttribute("aria-label", `${tabTitle(tab)} schliessen`);
-      close.title = "Schliessen (Strg+W)";
+      close.setAttribute("aria-label", tr(`${tabTitle(tab)} schliessen`));
+      close.title = tr("Schliessen (Strg+W)");
       close.textContent = "✕";
       element.append(close);
 

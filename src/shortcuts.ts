@@ -1,4 +1,5 @@
 import { fuzzyScore, type Command } from "./palette";
+import { searchable, tr } from "./i18n";
 
 /**
  * Die Tastenkürzel-Übersicht.
@@ -39,7 +40,7 @@ interface Group {
 
 /** Die Überschrift einer Gruppe: „Vim · Bewegen" oder schlicht „Rui". */
 function groupHeading(group: Group): string {
-  return group.scope ? `${group.scope} · ${group.title}` : group.title;
+  return group.scope ? `${group.scope} · ${tr(group.title)}` : tr(group.title);
 }
 
 /**
@@ -451,19 +452,22 @@ export class ShortcutsOverlay {
   private ruiRows(): ShortcutRow[] {
     // Die Befehlspalette hat als einzige keinen Eintrag in der Befehlsliste
     // — sie ist der Weg dorthin, nicht ein Befehl darin.
-    const rows: ShortcutRow[] = [{ title: "Befehlspalette", keys: "Strg+Umschalt+P" }];
+    const rows: ShortcutRow[] = [{ title: tr("Befehlspalette"), keys: tr("Strg+Umschalt+P") }];
     for (const command of this.actions.commands()) {
       if (!command.shortcut) continue;
-      const group = command.group && command.group !== "Rui" ? `${command.group}: ` : "";
+      const group = command.group && command.group !== "Rui" ? `${tr(command.group)}: ` : "";
       rows.push({
-        title: `${group}${command.title.replace(/…$/, "")}`,
-        keys: command.shortcut,
+        title: `${group}${tr(command.title).replace(/…$/, "")}`,
+        keys: tr(command.shortcut),
       });
     }
-    rows.push({ title: "Reiter 1 bis 9 direkt", keys: "Strg+1 … Strg+9" });
+    rows.push({ title: tr("Reiter 1 bis 9 direkt"), keys: tr("Strg+1 … Strg+9") });
 
     if (!this.actions.vimMode()) return rows;
-    return rows.map((row) => ({ ...row, instead: VIM_OVERRIDES[row.keys] }));
+    return rows.map((row) => {
+      const override = Object.entries(VIM_OVERRIDES).find(([keys]) => tr(keys) === row.keys)?.[1];
+      return { ...row, instead: override ? tr(override) : undefined };
+    });
   }
 }
 
@@ -476,9 +480,11 @@ export class ShortcutsOverlay {
  */
 function filterRows(group: Group, query: string): ShortcutRow[] {
   if (query === "") return group.rows;
-  const heading = groupHeading(group);
+  const heading = searchable(groupHeading(group));
   if (fuzzyScore(query, heading) > 0) return group.rows;
-  return group.rows.filter((row) => fuzzyScore(query, `${heading} ${row.title} ${row.keys}`) > 0);
+  return group.rows.filter(
+    (row) => fuzzyScore(query, searchable(`${heading} ${row.title} ${row.keys}`)) > 0,
+  );
 }
 
 function renderGroup(group: Group, rows: ShortcutRow[]): HTMLElement {

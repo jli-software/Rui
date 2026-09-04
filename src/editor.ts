@@ -86,6 +86,7 @@ export class RuiEditor {
     whitespace: new Compartment(),
     font: new Compartment(),
     readOnly: new Compartment(),
+    phrases: new Compartment(),
   };
 
   constructor(
@@ -135,6 +136,7 @@ export class RuiEditor {
         ]),
         this.c.language.of([]),
         this.c.readOnly.of([]),
+        this.c.phrases.of(this.phrasesExt()),
         this.c.theme.of(this.themeExt()),
         this.c.font.of(this.fontExt()),
         this.c.lineNumbers.of(this.lineNumberExt()),
@@ -270,6 +272,35 @@ export class RuiEditor {
       : [];
   }
 
+  private phrasesExt(): Extension {
+    if (this.settings.uiLanguage === "en") return [];
+    return EditorState.phrases.of({
+      Find: "Suchen",
+      Replace: "Ersetzen",
+      next: "nächster",
+      previous: "voriger",
+      all: "alle",
+      "match case": "Gross-/Kleinschreibung",
+      regexp: "regulärer Ausdruck",
+      "by word": "ganzes Wort",
+      replace: "ersetzen",
+      "replace all": "alle ersetzen",
+      close: "schliessen",
+      "current match": "aktueller Treffer",
+      "on line": "in Zeile",
+      "Go to line": "Gehe zu Zeile",
+      go: "los",
+      "replaced match on line $": "Treffer in Zeile $ ersetzt",
+      "replaced $ matches": "$ Treffer ersetzt",
+      "Control character": "Steuerzeichen",
+      "Selection deleted": "Auswahl gelöscht",
+      "folded code": "eingeklappter Code",
+      unfold: "ausklappen",
+      to: "bis",
+      Completions: "Vervollständigungen",
+    });
+  }
+
   /**
    * Relative Zeilennummern hängen von der Cursorposition ab, aber eine
    * reine Selektionsänderung zeichnet das Gutter nicht neu. Deshalb wird
@@ -305,6 +336,7 @@ export class RuiEditor {
         this.c.brackets.reconfigure(s.bracketMatching ? bracketMatching() : []),
         this.c.closeBrackets.reconfigure(s.closeBrackets ? closeBrackets() : []),
         this.c.whitespace.reconfigure(this.whitespaceExt()),
+        this.c.phrases.reconfigure(this.phrasesExt()),
       ],
     });
   }

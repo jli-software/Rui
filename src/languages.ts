@@ -1,5 +1,6 @@
 import { StreamLanguage, type StreamParser } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
+import { tr } from "./i18n";
 
 /**
  * Sprachunterstützung, ausschliesslich per dynamischem Import.
@@ -191,12 +192,12 @@ export function languageById(id: string): LanguageDef {
 /** Dateifilter für die Öffnen-/Speichern-Dialoge. */
 export function dialogFilters() {
   return [
-    { name: "Text und Markdown", extensions: ["txt", "md", "markdown", "log"] },
+    { name: tr("Text und Markdown"), extensions: ["txt", "md", "markdown", "log"] },
     {
       name: "Code",
       extensions: LANGUAGES.flatMap((l) => l.extensions).filter((e) => e !== ""),
     },
-    { name: "Alle Dateien", extensions: ["*"] },
+    { name: tr("Alle Dateien"), extensions: ["*"] },
   ];
 }
 

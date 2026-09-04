@@ -1,3 +1,5 @@
+import { tr } from "./i18n";
+
 /**
  * Rückfragen und Meldungen im Fenster statt vom System.
  *
@@ -62,8 +64,8 @@ export function dialog<T>(options: DialogOptions<T>): Promise<T> {
     const box = root.querySelector<HTMLElement>(".dialog")!;
     const title = root.querySelector<HTMLElement>(".dialog-title")!;
     const text = root.querySelector<HTMLElement>(".dialog-text")!;
-    title.textContent = options.title;
-    text.textContent = options.text;
+    title.textContent = tr(options.title);
+    text.textContent = tr(options.text);
     if (options.kind) box.dataset.kind = options.kind;
 
     const previous = document.activeElement as HTMLElement | null;
@@ -84,7 +86,7 @@ export function dialog<T>(options: DialogOptions<T>): Promise<T> {
       const button = document.createElement("button");
       button.className = "dialog-btn";
       if (action.tone) button.dataset.tone = action.tone;
-      button.textContent = action.label;
+      button.textContent = tr(action.label);
       button.addEventListener("click", () => done(action.value));
       buttons.append(button);
     }
@@ -142,7 +144,7 @@ export function confirmDialog(
     kind: options.kind ?? "warning",
     actions: [
       { label: options.okLabel, value: true, tone: options.danger ? "danger" : "primary" },
-      { label: options.cancelLabel ?? "Abbrechen", value: false },
+      { label: options.cancelLabel ?? tr("Abbrechen"), value: false },
     ],
     dismiss: false,
   });
@@ -157,7 +159,7 @@ export function alertDialog(
     title: options.title,
     text,
     kind: options.kind ?? "error",
-    actions: [{ label: "Schliessen", value: undefined, tone: "primary" }],
+    actions: [{ label: tr("Schliessen"), value: undefined, tone: "primary" }],
     dismiss: undefined,
   });
 }

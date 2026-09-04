@@ -1,3 +1,5 @@
+import { searchable } from "./i18n";
+
 export interface Command {
   id: string;
   title: string;
@@ -138,7 +140,7 @@ export class CommandPalette {
   private filter() {
     const q = this.input.value.trim();
     this.matches = this.commands()
-      .map((c) => ({ c, s: fuzzyScore(q, `${c.group ?? ""} ${c.title}`) }))
+      .map((c) => ({ c, s: fuzzyScore(q, searchable(`${c.group ?? ""} ${c.title}`)) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
       .map((x) => x.c);
