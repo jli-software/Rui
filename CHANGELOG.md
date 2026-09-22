@@ -17,6 +17,16 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Automatic updates — the updater plugin and keys must be bundled, so this
   has to be decided before the first release that should support it
 
+## [0.6.1] — 2026-09-22
+
+### Fixed
+- **Mouse, keyboard and Vim selections are reliably visible on every line.**
+  The opaque active-line highlight previously covered CodeMirror's selection
+  layer, making a drag within the current line appear broken even though the
+  text was selected. Rui now removes that covering highlight while a selection
+  exists and enforces a clear selection/background contrast in light, dark and
+  imported Omarchy themes.
+
 ## [0.6.0] — 2026-09-04
 
 ### Changed
@@ -970,7 +980,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.6.0...HEAD
+[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/jli-software/Rui/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/jli-software/Rui/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/jli-software/Rui/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/jli-software/Rui/compare/v0.5.2...v0.5.3

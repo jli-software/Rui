@@ -112,6 +112,15 @@ export class RuiEditor {
         // nichts mitläuft, das dieser Editor nicht braucht.
         history(),
         drawSelection(),
+        // The active-line background lives in the document layer, while
+        // CodeMirror draws selections behind it. Mark non-empty selections
+        // on the editor root so the theme can stop the active line from
+        // covering a same-line mouse or Vim selection.
+        EditorView.editorAttributes.of((view) => ({
+          class: view.state.selection.ranges.some((range) => !range.empty)
+            ? "cm-has-selection"
+            : "",
+        })),
         dropCursor(),
         rectangularSelection(),
         crosshairCursor(),
