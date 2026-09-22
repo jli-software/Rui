@@ -388,6 +388,10 @@ function highlightStyle(p: Palette) {
 
 /** Erzeugt das komplette CodeMirror-Theme aus einer Palette. */
 export function editorTheme(p: Palette, dark: boolean): Extension {
+  // CodeMirror's drawn selection is a layer behind the document. Keep the
+  // colour visibly distinct even when an imported palette provides a shade
+  // too close to the editor background.
+  const selection = ensureContrast(p.selection, p.bg, 2, p.text);
   const view = EditorView.theme(
     {
       "&": {
@@ -405,9 +409,13 @@ export function editorTheme(p: Palette, dark: boolean): Extension {
       },
       "&.cm-focused .cm-selectionBackgroundPrimary, .cm-selectionBackground, .cm-content ::selection":
         {
-          backgroundColor: `${p.selection} !important`,
+          backgroundColor: `${selection} !important`,
         },
       ".cm-activeLine": { backgroundColor: p.activeLine },
+      // `.cm-activeLine` is part of the content layer and therefore covers
+      // CodeMirror's selection layer when both are opaque. That made a drag
+      // confined to the active line look as if no selection had happened.
+      "&.cm-has-selection .cm-activeLine": { backgroundColor: "transparent" },
       ".cm-gutters": {
         backgroundColor: p.bg,
         color: p.gutter,
@@ -430,9 +438,9 @@ export function editorTheme(p: Palette, dark: boolean): Extension {
         outline: `1px solid ${p.accent}`,
       },
       ".cm-nonmatchingBracket": { color: p.danger },
-      ".cm-selectionMatch": { backgroundColor: p.selection },
+      ".cm-selectionMatch": { backgroundColor: selection },
       ".cm-searchMatch": {
-        backgroundColor: p.selection,
+        backgroundColor: selection,
         outline: `1px solid ${p.border}`,
       },
       ".cm-searchMatch.cm-searchMatch-selected": {
