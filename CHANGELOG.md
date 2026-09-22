@@ -17,6 +17,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Automatic updates — the updater plugin and keys must be bundled, so this
   has to be decided before the first release that should support it
 
+## [0.6.2] — 2026-09-22
+
+### Added
+- **Double-clicking the empty area beside the open tabs creates a new tab.**
+  It uses the same action as `Ctrl+T` and the plus button, while double-clicking
+  an existing tab continues to rename it.
+
 ## [0.6.1] — 2026-09-22
 
 ### Fixed
@@ -980,7 +987,8 @@ Erste Veröffentlichung.
 - Builds sind unsigniert, SmartScreen warnt beim ersten Start
 - Sinnvolle Dateigrösse bei rund 25 MB gedeckelt
 
-[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.6.1...HEAD
+[Unveröffentlicht]: https://github.com/jli-software/Rui/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/jli-software/Rui/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/jli-software/Rui/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/jli-software/Rui/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/jli-software/Rui/compare/v0.5.3...v0.5.4

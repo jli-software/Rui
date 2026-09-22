@@ -141,6 +141,7 @@ const translations: Record<string, string> = {
   "Ungespeichert": "Unsaved",
   "Datei umbenennen": "Rename file",
   "Doppelklick benennt um": "Double-click to rename",
+  "Doppelklick öffnet neuen Tab": "Double-click to open a new tab",
   "Klick kopiert den Pfad": "Click to copy the path",
   "Noch nicht gespeichert — Strg+S gibt der Notiz einen Namen":
     "Not saved yet — Ctrl+S gives the note a name",

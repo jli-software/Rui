@@ -96,14 +96,18 @@ export class TabBar {
       else this.actions.onSelect(id);
     });
 
-    // Doppelklick benennt um — der Griff, den Dateimanager und die
-    // Editoren daneben alle kennen. Der erste Klick hat den Reiter dabei
-    // schon aktiviert, es wird also immer der bearbeitet, den man sieht.
+    // Doppelklick auf einen Reiter benennt ihn um; im freien Bereich öffnet
+    // er einen neuen Reiter, wie in Notepad++. Der erste Klick auf einen
+    // bestehenden Reiter hat ihn dabei schon aktiviert, es wird also immer
+    // der bearbeitet, den man sieht.
     this.list.addEventListener("dblclick", (event) => {
       if ((event.target as HTMLElement).closest(".tab-close")) return;
       const id = this.idFrom(event.target);
-      if (id === null) return;
       event.preventDefault();
+      if (id === null) {
+        this.actions.onNew();
+        return;
+      }
       this.startRename(id);
     });
 
@@ -229,6 +233,7 @@ export class TabBar {
 
   private draw(tabs: Tab[], activeId: number) {
     this.root.hidden = tabs.length < 2;
+    this.list.title = tr("Doppelklick öffnet neuen Tab");
 
     this.list.innerHTML = "";
     for (const tab of tabs) {
